@@ -199,7 +199,7 @@ class Exporter:
             nodes_chs =[]
         else:
             nodes_bs = [n for n in nodes if n.is_bs]
-            nodes_chs =[n for n in nodes if not n.is_bs]
+            nodes_chs = [n for n in nodes if not n.is_bs]
             
         suffix = f"_{shard_index}" if shard_index >= 0 else ""
 
@@ -228,7 +228,6 @@ class Exporter:
         
         try:
             with open(f"data/stats{suffix}.json", "w", encoding="utf-8") as f:
-                json.dump(stats, f, ensure_ascii=False, indent=4)
-            logger.info(f"💾 Статистика и подписки для шарда {shard_index} сохранены.")
+                json.dump(stats, f)
         except Exception as e:
             logger.error(f"Ошибка сохранения stats: {e}")
