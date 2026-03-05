@@ -6,6 +6,7 @@ import re
 import html
 import asyncio
 import hashlib
+import uuid
 from typing import List, Optional
 import aiohttp
 
@@ -24,6 +25,11 @@ CONTROLLED_KEYS_COMMON = {
     "type", "security", "encryption", "path", "host",
     "sni", "peer", "fp", "alpn", "pbk", "sid", "flow",
     "servicename", "serviceName", "spx"
+}
+
+VALID_FINGERPRINTS = {
+    "chrome", "firefox", "safari", "ios", "android", 
+    "edge", "360", "qq", "random", "randomized"
 }
 
 
@@ -62,11 +68,18 @@ class LinkParser:
             return False
         try:
             ip = ipaddress.ip_address(h)
-            is_global = ip.is_global
-            return is_global
+            return ip.is_global
         except ValueError:
             is_valid_domain = bool(LinkParser.HOST_RE.match(h)) and len(h) >= 4
             return is_valid_domain
+
+    @staticmethod
+    def _is_valid_uuid(val: str) -> bool:
+        try:
+            uuid.UUID(str(val))
+            return True
+        except ValueError:
+            return False
 
     @classmethod
     def _is_garbage(cls, line: str) -> bool:
@@ -79,6 +92,73 @@ class LinkParser:
     @staticmethod
     def _extract_clean_meta(q_simple: dict) -> dict:
         return {k: v for k, v in q_simple.items() if k.lower() not in CONTROLLED_KEYS_COMMON}
+
+    @staticmethod
+    def _normalize_config(conf: ProxyConfig, protocol: str) -> Optional[ProxyConfig]:
+        if protocol in ("vless", "vmess"):
+            if not conf.uuid or not LinkParser._is_valid_uuid(conf.uuid):
+                return None
+
+        if not conf.type or conf.type.lower() in ("none", "null", ""):
+            conf.type = "tcp"
+        else:
+            conf.type = conf.type.lower()
+
+        actual_sni = conf.sni
+        if not actual_sni and conf.type not in ("ws", "websocket", "httpupgrade", "xhttp", "http", "h2"):
+            actual_sni = conf.host
+        if not actual_sni:
+            actual_sni = conf.server
+
+        if actual_sni:
+            actual_sni = actual_sni.strip("[]")
+            try:
+                ipaddress.ip_address(actual_sni)
+                actual_sni = None 
+            except ValueError:
+                pass
+                
+        conf.sni = actual_sni
+
+        if conf.security in ("tls", "reality"):
+            if not conf.fp or conf.fp.lower() not in VALID_FINGERPRINTS:
+                conf.fp = "chrome"
+            else:
+                conf.fp = conf.fp.lower()
+        else:
+            if conf.fp and conf.fp.lower() not in VALID_FINGERPRINTS:
+                conf.fp = None
+
+        if conf.security == "reality":
+            if not conf.alpn or conf.alpn.lower() in ("none", "null", ""):
+                conf.alpn = "h2,http/1.1"
+        elif conf.alpn and conf.alpn.lower() in ("none", "null", ""):
+            conf.alpn = None
+
+        if conf.security == "reality":
+            if not conf.sid or conf.sid.lower() in ("none", "null", ""):
+                conf.sid = ""
+            
+            clean_pbk = conf.pbk or ""
+            if len(clean_pbk) < 40 or len(clean_pbk) > 46:
+                return None
+            try:
+                decoded = base64.urlsafe_b64decode(clean_pbk + '=' * (-len(clean_pbk) % 4))
+                if len(decoded) != 32: return None
+            except Exception:
+                return None
+
+            if conf.type == "tcp" and (not conf.flow or conf.flow.lower() in ("none", "null", "")):
+                conf.flow = "xtls-rprx-vision"
+            elif conf.type != "tcp":
+                conf.flow = None
+
+        if conf.type == "grpc":
+            if not conf.service_name and conf.path:
+                conf.service_name = conf.path
+
+        return conf
+
 
     @staticmethod
     def parse_vless(line: str) -> Optional[ProxyNode]:
@@ -113,6 +193,10 @@ class LinkParser:
                 service_name=(q_simple.get('serviceName') or q_simple.get('servicename')) or None,
                 raw_meta=LinkParser._extract_clean_meta(q_simple),
             )
+            
+            conf = LinkParser._normalize_config(conf, "vless")
+            if not conf: return None
+            
             return ProxyNode(protocol="vless", config=conf, raw_uri=line)
         except Exception:
             return None
@@ -153,6 +237,10 @@ class LinkParser:
                 alter_id=alter_id,
                 raw_meta={k: v for k, v in data.items() if k.lower() not in VMESS_CONTROLLED},
             )
+            
+            conf = LinkParser._normalize_config(conf, "vmess")
+            if not conf: return None
+            
             return ProxyNode(protocol="vmess", config=conf, raw_uri=line)
         except Exception:
             return None
@@ -187,6 +275,10 @@ class LinkParser:
                 service_name=(q_simple.get('serviceName') or q_simple.get('servicename')) or None,
                 raw_meta=LinkParser._extract_clean_meta(q_simple),
             )
+            
+            conf = LinkParser._normalize_config(conf, "trojan")
+            if not conf: return None
+            
             return ProxyNode(protocol="trojan", config=conf, raw_uri=line)
         except Exception:
             return None
@@ -272,6 +364,10 @@ class LinkParser:
                 type="tcp",
                 raw_meta=LinkParser._extract_clean_meta(q_simple)
             )
+            
+            conf = LinkParser._normalize_config(conf, "ss")
+            if not conf: return None
+            
             return ProxyNode(protocol="ss", config=conf, raw_uri=original_line)
         except Exception:
             return None
@@ -305,6 +401,10 @@ class LinkParser:
                 obfs_password=q_simple.get('obfs-password') or None,
                 raw_meta={k: v for k, v in q_simple.items() if k.lower() not in HY2_CONTROLLED},
             )
+            
+            conf = LinkParser._normalize_config(conf, "hysteria2")
+            if not conf: return None
+            
             return ProxyNode(protocol="hysteria2", config=conf, raw_uri=original_line)
         except Exception:
             return None
