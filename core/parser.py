@@ -57,7 +57,6 @@ class LinkParser:
 
     @staticmethod
     def decode_base64(s: str) -> str:
-        """Интеграция Recursive Base64 Unpacking для вложенных кодировок подписок."""
         if not s or not s.strip():
             return s
             
@@ -145,11 +144,11 @@ class LinkParser:
         conf.sni = actual_sni
 
         if conf.security in ("tls", "reality"):
+            conf.raw_meta["allowInsecure"] = "1"
+            conf.raw_meta["insecure"] = "1"
+            
             if not conf.fp or conf.fp.lower() not in VALID_FINGERPRINTS:
                 conf.fp = "chrome"
-            else:
-                conf.fp = conf.fp.lower()
-
             if not conf.alpn or conf.alpn.lower() in ("none", "null", ""):
                 conf.alpn = "h2,http/1.1"
 
@@ -165,6 +164,10 @@ class LinkParser:
                 if len(decoded) != 32: return None
             except Exception:
                 return None
+                
+            if conf.type == "tcp" and protocol == "vless":
+                if not conf.flow or conf.flow.lower() in ("none", "null", ""):
+                    conf.flow = "xtls-rprx-vision"
 
         if conf.type == "grpc":
             if not conf.service_name and conf.path:
@@ -447,7 +450,7 @@ class LinkParser:
             return ""
 
     async def fetch_and_parse(self) -> List[ProxyNode]:
-        nodes: List[ProxyNode] = []
+        nodes: List[ProxyNode] =[]
         seen_ids: set = set()
         machine_counts: dict = {}
         
@@ -455,7 +458,7 @@ class LinkParser:
 
         raw_sources = CONFIG.SUBSCRIPTION_SOURCES
         if not raw_sources: 
-            return []
+            return[]
 
         if isinstance(raw_sources, list):
             sources = list(dict.fromkeys(s.strip() for s in raw_sources if s.strip()))
