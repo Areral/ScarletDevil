@@ -1,5 +1,3 @@
-# core/engine.py
-
 import asyncio
 import json
 import os
@@ -21,8 +19,8 @@ from typing import List, Optional
 from core.models import ProxyNode
 from core.settings import CONFIG
 
-CHAMPION_BYTES = 50 * 1024 * 1024
-NORMAL_BYTES = 3 * 1024 * 1024
+CHAMPION_BYTES = 10 * 1024 * 1024 
+NORMAL_BYTES = 3 * 1024 * 1024    
 CHUNK_SIZE = 65536
 BATCH_HARD_TIMEOUT = 240.0
 
@@ -42,7 +40,7 @@ class BatchEngine:
     def __init__(self):
         self.ping_semaphore = asyncio.Semaphore(150)
         self.speed_semaphore = asyncio.Semaphore(8) 
-        logger.info("⚙ Engine готов. DoH + 3MB Speedtest + UserAgent Matrix.")
+        logger.info("⚙ Engine готов. DoH + 3MB Speedtest + Адаптивные Тайм-ауты.")
 
     @classmethod
     def _ensure_lock(cls):
@@ -100,7 +98,7 @@ class BatchEngine:
 
     @staticmethod
     def _generate_batch_config(nodes: List[ProxyNode], base_port: int) -> dict:
-        inbounds = []
+        inbounds =[]
         outbounds = []
         rules =[{"protocol": "dns", "outbound": "direct"}]
 
@@ -204,7 +202,7 @@ class BatchEngine:
                 if c.host: base["transport"]["host"] = c.host
             elif c.type in ("http", "h2"):
                 base["transport"] = {"type": "http", "path": c.path or "/"}
-                if c.host: base["transport"]["host"] = [h.strip() for h in c.host.split(",") if h.strip()]
+                if c.host: base["transport"]["host"] =[h.strip() for h in c.host.split(",") if h.strip()]
             elif c.type == "quic":
                 base["transport"] = {"type": "quic"}
 
@@ -220,7 +218,7 @@ class BatchEngine:
                     clean_fp = c.fp.lower()
                     if clean_fp in {"chrome", "firefox", "edge", "safari", "360", "qq", "ios", "android", "random", "randomized"}:
                         tls["utls"] = {"enabled": True, "fingerprint": clean_fp}
-                elif c.security == "reality":
+                elif c.security in ("reality", "tls"):
                     tls["utls"] = {"enabled": True, "fingerprint": "chrome"}
 
                 allow_insecure = False
@@ -238,7 +236,7 @@ class BatchEngine:
 
                 if c.alpn:
                     tls["alpn"] =[x.strip() for x in c.alpn.split(",") if x.strip()]
-                elif c.security == "reality":
+                elif c.security in ("reality", "tls"):
                     tls["alpn"] = ["h2", "http/1.1"]
 
                 if c.security == "reality":
@@ -318,8 +316,8 @@ class BatchEngine:
                 async with self.ping_semaphore:
                     t0 = time.perf_counter()
                     try:
-                        ping_timeout = aiohttp.ClientTimeout(total=8.0, connect=3.0)
-                        async with session.get(target_url, allow_redirects=False, timeout=ping_timeout) as resp:
+                        ping_timeout = aiohttp.ClientTimeout(total=10.0, connect=5.0)
+                        async with session.get(target_url, allow_redirects=False, timeout=ping_timeout, ssl=False) as resp:
                             if resp.status not in (200, 204, 301, 302): 
                                 return {"status": "error"}
                             latency = int((time.perf_counter() - t0) * 1000)
@@ -347,14 +345,15 @@ class BatchEngine:
         try:
             async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
                 url = CONFIG.checking.get("champion_test_url" if is_champion else "speedtest_url")
-                dl_timeout = aiohttp.ClientTimeout(total=12.0 if is_champion else 8.0)
+                
+                dl_timeout = aiohttp.ClientTimeout(total=15.0 if is_champion else 12.0)
                 target_bytes = CHAMPION_BYTES if is_champion else NORMAL_BYTES
 
                 async with self.speed_semaphore:
                     t_start = time.perf_counter()
                     total = 0
                     try:
-                        async with session.get(url, timeout=dl_timeout) as resp:
+                        async with session.get(url, timeout=dl_timeout, ssl=False) as resp:
                             if resp.status != 200: 
                                 return {"status": "error"}
                             try:
@@ -368,7 +367,7 @@ class BatchEngine:
                     except Exception:
                         pass
 
-                if total < 512 * 1024:
+                if total < 256 * 1024:
                     return {"status": "drop"}
 
                 dur = max(time.perf_counter() - t_start, 0.1)
@@ -385,7 +384,7 @@ class BatchEngine:
                 else:
                     async def fetch_geo(geo_url: str, t_out: float) -> str:
                         try:
-                            async with session.get(geo_url, timeout=aiohttp.ClientTimeout(total=t_out)) as geo:
+                            async with session.get(geo_url, timeout=aiohttp.ClientTimeout(total=t_out), ssl=False) as geo:
                                 if geo.status == 200:
                                     content = await geo.text()
                                     if "cloudflare" in geo_url or "trace" in geo_url:
@@ -579,7 +578,7 @@ class Inspector:
                 try:
                     await asyncio.wait_for(
                         loop.getaddrinfo(host, port, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM),
-                        timeout=1.0
+                        timeout=2.0
                     )
                 except Exception:
                     return None
@@ -587,7 +586,7 @@ class Inspector:
             try:
                 await asyncio.sleep(random.uniform(0, 0.2))
                 fut = asyncio.open_connection(host, port)
-                reader, writer = await asyncio.wait_for(fut, timeout=1.0)
+                reader, writer = await asyncio.wait_for(fut, timeout=3.5)
                 writer.close()
                 try: 
                     await writer.wait_closed()
