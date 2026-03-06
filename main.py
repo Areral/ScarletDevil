@@ -12,7 +12,7 @@ from core.validator import RKNValidator
 
 async def main():
     start_time = time.perf_counter()
-    logger.info("⏣ Запуск Scarlet Devil Network v14 (Matrix Sharding Edition)")
+    logger.info("⏣ Запуск Scarlet Devil Network v15 (DPI Bypass Edition)")
 
     shard_index = int(os.environ.get("SHARD_INDEX", "0"))
     shard_count = int(os.environ.get("SHARD_COUNT", "1"))
@@ -40,7 +40,6 @@ async def main():
         logger.info("⚙ Пакетная проверка (Batch Engine)...")
 
         alive_nodes = await inspector.process_all(nodes)
-        
         l4_dropped = inspector.l4_dropped
         
         for node in alive_nodes:
@@ -49,30 +48,13 @@ async def main():
 
         dead_sources =[url for url, m in parser.metrics.items() if m.get("parsed", 0) > 0 and m.get("alive", 0) == 0]
         
-        if dead_sources:
-            logger.warning(f"⚠ Обнаружено {len(dead_sources)} источников с нулевым выходом. Запуск Retry Phase...")
-            retry_nodes =[n for n in nodes if n.source_url in dead_sources]
-            retry_alive = await inspector.process_all(retry_nodes)
-            
-            if retry_alive:
-                logger.success(f"⚑ Retry Phase спасла {len(retry_alive)} узлов!")
-                alive_nodes.extend(retry_alive)
-                
-                l4_dropped += inspector.l4_dropped
-                
-                for node in retry_alive:
-                    if node.source_url in parser.metrics:
-                        parser.metrics[node.source_url]["alive"] = parser.metrics[node.source_url].get("alive", 0) + 1
-                        
-            dead_sources =[url for url, m in parser.metrics.items() if m.get("parsed", 0) > 0 and m.get("alive", 0) == 0]
-        
         unique_alive = {}
         for n in alive_nodes:
             unique_alive[n.strict_id] = n
         alive_nodes = list(unique_alive.values())
 
         if dead_sources:
-            logger.warning("Источники, окончательно выдавшие 0 рабочих прокси (после Retry):")
+            logger.warning("Источники, выдавшие 0 рабочих прокси:")
             for src in dead_sources:
                 safe_src = src.replace("://", ":\u200b//").replace(".", ".\u200b")
                 logger.warning(f"   - {safe_src}")
