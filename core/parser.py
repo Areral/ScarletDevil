@@ -32,6 +32,7 @@ VALID_FINGERPRINTS = {
     "edge", "360", "qq", "random", "randomized"
 }
 
+_SUBSCRIPTION_PROTOCOLS = ("vless://", "vmess://", "trojan://", "ss://", "hysteria://", "hysteria2://", "hy2://")
 
 class LinkParser:
     GARBAGE_WORDS =[
@@ -47,15 +48,38 @@ class LinkParser:
         self._seen_content_hashes: set = set()
 
     @staticmethod
+    def _content_has_protocol_lines(text: str) -> bool:
+        for line in text.splitlines():
+            line = line.strip()
+            if any(line.startswith(p) for p in _SUBSCRIPTION_PROTOCOLS):
+                return True
+        return False
+
+    @staticmethod
     def decode_base64(s: str) -> str:
-        try:
-            s = s.strip().replace('-', '+').replace('_', '/')
-            s = re.sub(r'\s+', '', s)
-            missing = len(s) % 4
-            if missing: s += "=" * (4 - missing)
-            return base64.b64decode(s.encode('ascii', 'ignore')).decode('utf-8', 'ignore')
-        except Exception:
+        """Интеграция Recursive Base64 Unpacking для вложенных кодировок подписок."""
+        if not s or not s.strip():
             return s
+            
+        s = s.strip()
+        if LinkParser._content_has_protocol_lines(s):
+            return s
+
+        raw = "".join(s.split())
+        for encoding in (base64.standard_b64decode, base64.urlsafe_b64decode):
+            try:
+                padded = raw
+                if len(padded) % 4:
+                    padded += "=" * (4 - len(padded) % 4)
+                decoded = encoding(padded)
+                if isinstance(decoded, bytes):
+                    decoded = decoded.decode("utf-8", errors="replace")
+                decoded = decoded.strip()
+                if decoded and LinkParser._content_has_protocol_lines(decoded):
+                    return decoded
+            except Exception:
+                continue
+        return s
 
     @staticmethod
     def is_valid_host(host: str) -> bool:
@@ -423,7 +447,7 @@ class LinkParser:
             return ""
 
     async def fetch_and_parse(self) -> List[ProxyNode]:
-        nodes: List[ProxyNode] =[]
+        nodes: List[ProxyNode] = []
         seen_ids: set = set()
         machine_counts: dict = {}
         
@@ -431,7 +455,7 @@ class LinkParser:
 
         raw_sources = CONFIG.SUBSCRIPTION_SOURCES
         if not raw_sources: 
-            return[]
+            return []
 
         if isinstance(raw_sources, list):
             sources = list(dict.fromkeys(s.strip() for s in raw_sources if s.strip()))
@@ -464,8 +488,7 @@ class LinkParser:
 
             nodes_from_source = 0
 
-            if "://" not in content[:200]:
-                content = LinkParser.decode_base64(content)
+            content = LinkParser.decode_base64(content)
 
             for raw_line in content.splitlines():
                 line = raw_line.strip()
