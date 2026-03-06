@@ -40,7 +40,7 @@ class BatchEngine:
     def __init__(self):
         self.ping_semaphore = asyncio.Semaphore(100)
         self.speed_semaphore = asyncio.Semaphore(6) 
-        logger.info("⚙ Engine готов. Strict Hijack Filter + Anti-OOM Protection.")
+        logger.info("⚙ Engine готов. Smart CDN-Filter + OOM Protection.")
 
     @classmethod
     def _ensure_lock(cls):
@@ -98,7 +98,7 @@ class BatchEngine:
 
     @staticmethod
     def _generate_batch_config(nodes: List[ProxyNode], base_port: int) -> dict:
-        inbounds = []
+        inbounds =[]
         outbounds = []
         
         rules =[
@@ -247,7 +247,7 @@ class BatchEngine:
                 if c.alpn:
                     tls["alpn"] =[x.strip() for x in c.alpn.split(",") if x.strip()]
                 elif c.security in ("reality", "tls"):
-                    tls["alpn"] =["h2", "http/1.1"]
+                    tls["alpn"] = ["h2", "http/1.1"]
 
                 if c.security == "reality":
                     clean_pbk = c.pbk or ""
@@ -318,7 +318,7 @@ class BatchEngine:
         headers = {"User-Agent": random.choice(USER_AGENTS)}
         max_latency = CONFIG.checking.get("max_latency", 5000)
         
-        all_urls = CONFIG.checking.get("connectivity_urls", ["http://www.gstatic.com/generate_204"])
+        all_urls = CONFIG.checking.get("connectivity_urls",["http://www.gstatic.com/generate_204"])
         test_urls = random.sample(all_urls, min(2, len(all_urls)))
 
         try:
@@ -465,7 +465,7 @@ class BatchEngine:
         config_data = self._generate_batch_config(nodes, base_port)
         
         if not await self._is_config_valid(config_data, batch_id):
-            valid_nodes = []
+            valid_nodes =[]
             for n in nodes:
                 single_cfg = self._generate_batch_config([n], base_port)
                 if await self._is_config_valid(single_cfg, batch_id):
@@ -502,7 +502,7 @@ class BatchEngine:
                     logger.error(f"sing-box упал при старте: {stderr_out.decode(errors='replace')}")
                 except Exception:
                     pass
-                return[]
+                return []
 
             first_port = config_data["inbounds"][0]["listen_port"]
             if not await self._wait_for_port("127.0.0.1", first_port, timeout=5.0):
@@ -562,13 +562,13 @@ class BatchEngine:
 
         except asyncio.TimeoutError:
             logger.warning(f"Жесткий таймаут батча {batch_id}.")
-            return[]
+            return []
         except Exception:
             return[]
         finally:
             if proc and proc.returncode is None:
                 try:
-                    proc.terminate() 
+                    proc.terminate()
                     await asyncio.wait_for(proc.wait(), timeout=2.0)
                 except Exception:
                     try:
@@ -611,13 +611,16 @@ class Inspector:
             if ip_obj.is_loopback or ip_obj.is_private:
                 return None
                     
-            forbidden_networks =[
-                "1.1.1.0/24", "1.0.0.0/24", "8.8.8.0/24", "8.8.4.0/24",
-                "162.159.0.0/16", "104.16.0.0/12", "172.64.0.0/13"
-            ]
-            for net_str in forbidden_networks:
-                if ip_obj in ipaddress.ip_network(net_str):
-                    return None
+            is_cdn_allowed = node.config.type in ("ws", "websocket", "httpupgrade", "xhttp")
+            
+            if not is_cdn_allowed:
+                forbidden_networks =[
+                    "1.1.1.0/24", "1.0.0.0/24", "8.8.8.0/24", "8.8.4.0/24",
+                    "162.159.0.0/16", "104.16.0.0/12", "172.64.0.0/13"
+                ]
+                for net_str in forbidden_networks:
+                    if ip_obj in ipaddress.ip_network(net_str):
+                        return None
 
             try:
                 await asyncio.sleep(random.uniform(0, 0.2))
