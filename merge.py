@@ -72,7 +72,7 @@ def build_html(total_alive: int, top_speed: float):
             with open(js_path, "r", encoding="utf-8") as f:
                 js = f.read()
 
-        now = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+        now = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=3)
         public_url = CONFIG.app.get("public_url", "")
 
         html_out = (
@@ -91,7 +91,7 @@ def build_html(total_alive: int, top_speed: float):
 
 def merge_subscription_files(pattern: str, output_file: str, title: str):
     files = glob.glob(pattern)
-    unique_links = set()
+    unique_map = {}
     
     for f_path in files:
         try:
@@ -100,11 +100,14 @@ def merge_subscription_files(pattern: str, output_file: str, title: str):
                     line = line.strip()
                     if not line or line.startswith("#"):
                         continue
-                    unique_links.add(line)
+                    
+                    base_uri = line.split('#')[0]
+                    if base_uri not in unique_map:
+                        unique_map[base_uri] = line
         except Exception as e:
             logger.error(f"Ошибка чтения {f_path}: {e}")
 
-    sorted_links = list(unique_links)
+    sorted_links = list(unique_map.values())
     sorted_links.sort()
 
     with open(output_file, "w", encoding="utf-8") as f:
@@ -143,12 +146,12 @@ def main():
                     
                 stats["durations"][shard_idx] = data.get("duration", 0.0)
                 
-                for src in data.get("dead_sources",[]):
+                for src in data.get("dead_sources", []):
                     stats["dead_sources"].add(src)
         except Exception as e:
             logger.error(f"Ошибка чтения статы {f_path}: {e}")
 
-    logger.info("🗃️ Склейка подписок...")
+    logger.info("🗃️ Склейка подписок (Lossless Deduplication)...")
     stats["unique_alive"] = merge_subscription_files("shards_temp/shard-data-*/sub_all_*.txt", "sub_all.txt", "Scarlet Devil | Gungnir (MIX)")
     stats["bs_count"] = merge_subscription_files("shards_temp/shard-data-*/sub_bs_*.txt", "sub_bs.txt", "Scarlet Devil | Nightbird (БС)")
     merge_subscription_files("shards_temp/shard-data-*/sub_chs_*.txt", "sub_chs.txt", "Scarlet Devil | Vampire Dash (ЧС)")
