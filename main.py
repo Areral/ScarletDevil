@@ -26,7 +26,7 @@ async def main():
 
         if not nodes:
             logger.error("✘ Нет валидных ссылок. Завершение.")
-            os._exit(0)
+            return
             
         if shard_count > 1:
             total_nodes = len(nodes)
@@ -73,11 +73,10 @@ async def main():
         )
 
         logger.info(f"✔ Завершено за {duration:.2f} сек. Дрон отключен.")
-        os._exit(0)
         
     except Exception as e:
         logger.exception(f"Критический сбой в main(): {e}")
-        os._exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -94,7 +93,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.warning("Остановка пользователем")
-        os._exit(1)
-    except Exception as e:
-        logger.critical(f"FATAL ERROR ВНЕ EVENT LOOP: {e}")
-        os._exit(1)
+        sys.exit(1)
