@@ -1,0 +1,24 @@
+{
+  "rewrites": [
+    { "source": "/sub/all", "destination": "/sub_all.txt" },
+    { "source": "/sub/bs", "destination": "/sub_bs.txt" },
+    { "source": "/sub/chs", "destination": "/sub_chs.txt" },
+    { "source": "/sub/elite", "destination": "/sub_elite.txt" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/sub/(.*)",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
+        { "key": "Cache-Control", "value": "s-maxage=0, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=0, max-age=0, must-revalidate" }
+      ]
+    }
+  ]
+}
