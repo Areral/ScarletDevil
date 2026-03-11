@@ -1,6 +1,7 @@
 import aiohttp
 import ipaddress
 import asyncio
+from loguru import logger
 from core.settings import CONFIG
 from core.models import ProxyNode
 
@@ -15,15 +16,21 @@ class RKNValidator:
         if not url: 
             return ""
         try:
+            logger.debug(f"RKNValidator: Запрос БД РКН по адресу {url}")
             async with session.get(url) as resp:
                 if resp.status == 200:
-                    return await resp.text()
-        except Exception:
-            pass
+                    text = await resp.text()
+                    logger.debug(f"RKNValidator: Успешно загружен манифест ({len(text)} байт) из {url}")
+                    return text
+                else:
+                    logger.warning(f"RKNValidator: Ошибка HTTP {resp.status} для {url}")
+        except Exception as e:
+            logger.error(f"RKNValidator: Сбой загрузки БД ТСПУ ({url}): {e}")
         return ""
 
     @classmethod
     async def load_lists(cls):
+        logger.info("RKNValidator: Запуск загрузки маршрутных листов ТСПУ/РКН (Белые списки)")
         cls.domains_wl.clear()
         cls.ips_wl.clear()
         cls.networks_wl.clear()
@@ -81,6 +88,9 @@ class RKNValidator:
 
         if cls.domains_wl or cls.ips_wl or cls.networks_wl:
             cls._is_loaded = True
+            logger.info(f"RKNValidator: Базы успешно загружены (Доменов: {len(cls.domains_wl)}, IP/Подсетей: {len(cls.ips_wl) + len(cls.networks_wl)})")
+        else:
+            logger.warning("RKNValidator: ВНИМАНИЕ! Базы ТСПУ пусты. Все узлы будут помечены как ЧС.")
 
     @classmethod
     def check_bs(cls, node: ProxyNode) -> bool:
@@ -97,12 +107,14 @@ class RKNValidator:
         target = target.lower().strip("[]")
         
         if target in cls.domains_wl or target in cls.ips_wl:
+            logger.debug(f"RKNValidator: Узел {target} классифицирован как БС (Прямое совпадение)")
             return True
             
         try:
             ip_obj = ipaddress.ip_address(target)
             for net in cls.networks_wl:
                 if ip_obj in net:
+                    logger.debug(f"RKNValidator: Узел {target} классифицирован как БС (Входит в подсеть {net})")
                     return True
             return False
         except ValueError:
@@ -110,6 +122,7 @@ class RKNValidator:
             for i in range(1, len(parts) - 1):
                 base_domain = '.'.join(parts[i:])
                 if base_domain in cls.domains_wl:
+                    logger.debug(f"RKNValidator: Узел {target} классифицирован как БС (По базовому домену {base_domain})")
                     return True
                         
             return False
