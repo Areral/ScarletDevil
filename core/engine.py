@@ -97,9 +97,28 @@ class BatchEngine:
         return None
 
     @staticmethod
+    def _resolve_payload_ssl(node: ProxyNode, target_url: str) -> bool:
+        if not target_url.startswith("https"):
+            return False
+            
+        if node.config.security == "reality":
+            return True
+            
+        allow_insecure = False
+        for k, v in node.config.raw_meta.items():
+            if k.lower() in ("allowinsecure", "insecure") and str(v).lower() in ("1", "true", "yes"):
+                allow_insecure = True
+                break
+                
+        if allow_insecure:
+            return False
+            
+        return True
+
+    @staticmethod
     def _generate_batch_config(nodes: List[ProxyNode], base_port: int) -> dict:
         logger.debug(f"BatchEngine: Генерация JSON-конфигурации Sing-box для {len(nodes)} узлов, стартовый порт {base_port}")
-        inbounds = []
+        inbounds =[]
         outbounds = []
         
         rules =[
@@ -127,7 +146,7 @@ class BatchEngine:
                 "listen_port": local_port,
             })
             outbounds.append(outbound)
-            rules.append({"inbound":[f"in-{i}"], "outbound": tag})
+            rules.append({"inbound": [f"in-{i}"], "outbound": tag})
 
         outbounds.append({"type": "direct", "tag": "direct"})
         outbounds.append({"type": "block", "tag": "block"})
@@ -249,9 +268,9 @@ class BatchEngine:
                 if export_sni: tls["server_name"] = export_sni
 
                 if c.alpn:
-                    tls["alpn"] = [x.strip() for x in c.alpn.split(",") if x.strip()]
+                    tls["alpn"] =[x.strip() for x in c.alpn.split(",") if x.strip()]
                 elif c.security in ("reality", "tls"):
-                    tls["alpn"] =["h2", "http/1.1"]
+                    tls["alpn"] = ["h2", "http/1.1"]
 
                 if c.security == "reality":
                     clean_pbk = c.pbk or ""
@@ -326,7 +345,7 @@ class BatchEngine:
         headers = {"User-Agent": random.choice(USER_AGENTS)}
         max_latency = CONFIG.checking.get("max_latency", 5000)
         
-        all_urls = CONFIG.checking.get("connectivity_urls", ["http://www.gstatic.com/generate_204"])
+        all_urls = CONFIG.checking.get("connectivity_urls",["http://www.gstatic.com/generate_204"])
         test_urls = random.sample(all_urls, min(2, len(all_urls)))
 
         try:
@@ -336,7 +355,7 @@ class BatchEngine:
                         t0 = time.perf_counter()
                         try:
                             ping_timeout = aiohttp.ClientTimeout(total=5.0, connect=3.0)
-                            async with session.get(target_url, allow_redirects=False, timeout=ping_timeout, ssl=False) as resp:
+                            async with session.get(target_url, allow_redirects=False, timeout=ping_timeout) as resp:
                                 if resp.status != 204:
                                     logger.debug(f"BatchEngine: Ping {node.config.server} отклонён (Hijack - HTTP {resp.status})")
                                     break
@@ -369,15 +388,17 @@ class BatchEngine:
         port = node_data["port"]
         latency = node_data["latency"]
         
-        logger.debug(f"BatchEngine: Запуск Speed-фазы для {node.config.server}")
-        
         connector = ProxyConnector.from_url(f"socks5://127.0.0.1:{port}", rdns=True)
         headers = {"User-Agent": random.choice(USER_AGENTS)}
         min_speed = CONFIG.checking.get("min_speed", 1.0)
         
+        url = CONFIG.checking.get("champion_test_url" if is_champion else "speedtest_url")
+        target_ssl = self._resolve_payload_ssl(node, url)
+        
+        logger.debug(f"BatchEngine: Запуск Speed-фазы (SSL Check: {target_ssl}) для {node.config.server}")
+        
         try:
             async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
-                url = CONFIG.checking.get("champion_test_url" if is_champion else "speedtest_url")
                 dl_timeout = aiohttp.ClientTimeout(total=15.0 if is_champion else 12.0)
                 target_bytes = CHAMPION_BYTES if is_champion else NORMAL_BYTES
 
@@ -385,10 +406,10 @@ class BatchEngine:
                     t_start = time.perf_counter()
                     total = 0
                     try:
-                        async with session.get(url, timeout=dl_timeout, ssl=False) as resp:
+                        async with session.get(url, timeout=dl_timeout, ssl=target_ssl) as resp:
                             if resp.status == 429:
-                                total = target_bytes
-                                t_start = time.perf_counter() - 2.0 
+                                logger.debug(f"BatchEngine: Speed {node.config.server} отклонён (HTTP 429 - Узел перегружен спамом)")
+                                return {"status": "drop"}
                             elif resp.status != 200: 
                                 logger.debug(f"BatchEngine: Speed {node.config.server} ошибка (HTTP {resp.status})")
                                 return {"status": "error"}
@@ -408,6 +429,9 @@ class BatchEngine:
                                     pass 
                     except asyncio.TimeoutError:
                         pass
+                    except aiohttp.ClientConnectorCertificateError:
+                        logger.warning(f"BatchEngine: Speed {node.config.server} отклонён (Honeypot / Invalid Cert)")
+                        return {"status": "error"}
                     except Exception as e:
                         logger.debug(f"BatchEngine: Speed {node.config.server} ошибка загрузки ({e})")
                         pass
@@ -475,7 +499,7 @@ class BatchEngine:
             return {"status": "error"}
 
     async def check_batch(self, nodes: List[ProxyNode], is_champion: bool = False, batch_num: int = 0) -> List[ProxyNode]:
-        if not nodes: return []
+        if not nodes: return[]
         logger.info(f"BatchEngine: Старт тестирования Batch {batch_num} (Узлов: {len(nodes)})")
 
         batch_id = uuid.uuid4().hex[:8]
@@ -562,7 +586,7 @@ class BatchEngine:
                 
                 if not valid_nodes_for_speed:
                     logger.info(f"BatchEngine: Batch {batch_num} Speed-фаза отменена (Нет рабочих узлов)")
-                    return []
+                    return[]
 
                 logger.debug(f"BatchEngine: Batch {batch_num} - Ожидание Speed-фазы...")
                 speed_tasks =[self._speed_phase(vp, is_champion) for vp in valid_nodes_for_speed]
@@ -587,7 +611,7 @@ class BatchEngine:
 
         except asyncio.TimeoutError:
             logger.error(f"BatchEngine: Глобальный Timeout ({BATCH_HARD_TIMEOUT}s) для Batch {batch_id}")
-            return []
+            return[]
         except Exception as e:
             logger.error(f"BatchEngine: Исключение в check_batch ({batch_id}): {e}")
             return[]
