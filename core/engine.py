@@ -36,6 +36,7 @@ class BatchEngine:
     _GEO_CACHE: dict = {}
     _PORT_COUNTER: int = 10000
     _PORT_LOCK: Optional[asyncio.Lock] = None
+    _VALIDATED_BYPASS_URLS: List[str] =[]
 
     def __init__(self):
         self.ping_semaphore = asyncio.Semaphore(100)
@@ -46,6 +47,38 @@ class BatchEngine:
     def _ensure_lock(cls):
         if cls._PORT_LOCK is None:
             cls._PORT_LOCK = asyncio.Lock()
+
+    @classmethod
+    async def validate_bypass_urls(cls):
+        if cls._VALIDATED_BYPASS_URLS: 
+            return
+            
+        raw_urls = CONFIG.checking.get("bypass_urls",[
+            "https://abs.twimg.com/favicons/twitter.3.ico"
+        ])
+        
+        logger.info(f"BatchEngine: Pre-Flight проверка {len(raw_urls)} Bypass-ссылок с хост-машины...")
+        valid_urls =[]
+        headers = {"User-Agent": random.choice(USER_AGENTS)}
+        
+        async with aiohttp.ClientSession(headers=headers) as session:
+            for url in raw_urls:
+                try:
+                    async with session.get(url, timeout=5.0, allow_redirects=True) as resp:
+                        if resp.status in (200, 301, 302, 304, 403):
+                            valid_urls.append(url)
+                            logger.debug(f"BatchEngine: Bypass-ссылка [{url}] УСПЕШНА (HTTP {resp.status})")
+                        else:
+                            logger.warning(f"BatchEngine: Bypass-ссылка [{url}] ОТКЛОНЕНА хостом (HTTP {resp.status})")
+                except Exception as e:
+                    logger.warning(f"BatchEngine: Bypass-ссылка [{url}] НЕДОСТУПНА с хоста ({e})")
+        
+        if not valid_urls:
+            logger.error("BatchEngine: КРИТИЧЕСКАЯ ОШИБКА. Все Bypass-ссылки мертвы для хоста! Используем резервный Fallback.")
+            cls._VALIDATED_BYPASS_URLS =["https://www.google.com/favicon.ico"]
+        else:
+            cls._VALIDATED_BYPASS_URLS = valid_urls
+            logger.info(f"BatchEngine: Успешно сформирован золотой пул из {len(valid_urls)} Bypass-ссылок.")
 
     @classmethod
     async def _get_next_base_port(cls, batch_size: int) -> int:
@@ -345,42 +378,52 @@ class BatchEngine:
         headers = {"User-Agent": random.choice(USER_AGENTS)}
         max_latency = CONFIG.checking.get("max_latency", 5000)
         
-        all_urls = CONFIG.checking.get("connectivity_urls",["http://www.gstatic.com/generate_204"])
-        test_urls = random.sample(all_urls, min(2, len(all_urls)))
+        test_urls = random.sample(CONFIG.checking.get("connectivity_urls",["http://www.gstatic.com/generate_204"]), 2)
+        
+        bypass_urls = BatchEngine._VALIDATED_BYPASS_URLS
 
         try:
             async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
                 async with self.ping_semaphore:
+                    base_passed = False
+                    t0 = time.perf_counter()
                     for target_url in test_urls:
-                        t0 = time.perf_counter()
                         try:
-                            ping_timeout = aiohttp.ClientTimeout(total=5.0, connect=3.0)
+                            ping_timeout = aiohttp.ClientTimeout(total=4.0, connect=2.5)
                             async with session.get(target_url, allow_redirects=False, timeout=ping_timeout) as resp:
-                                if resp.status != 204:
-                                    logger.debug(f"BatchEngine: Ping {node.config.server} отклонён (Hijack - HTTP {resp.status})")
-                                    break
-                                
-                                body = await resp.content.read(1024) 
-                                if len(body) > 0:
-                                    logger.debug(f"BatchEngine: Ping {node.config.server} отклонён (Hijack - Payload != 0)")
-                                    break
-                                
-                                latency = int((time.perf_counter() - t0) * 1000)
-                                if latency > max_latency: 
-                                    logger.debug(f"BatchEngine: Ping {node.config.server} отклонён (Latency {latency}ms > {max_latency}ms)")
-                                    return {"status": "high_latency"}
-                                
-                                logger.debug(f"BatchEngine: Ping {node.config.server} успешен (Latency {latency}ms)")
-                                return {"status": "ok", "node": node, "port": port, "latency": latency}
-                                
-                        except (asyncio.TimeoutError, aiohttp.ClientError) as e:
-                            logger.debug(f"BatchEngine: Ping {node.config.server} ошибка ({e})")
+                                if resp.status == 204:
+                                    body = await resp.content.read(1024) 
+                                    if len(body) == 0:
+                                        base_passed = True
+                                        break
+                        except (asyncio.TimeoutError, aiohttp.ClientError):
                             continue
                             
-                    return {"status": "error"}
+                    if not base_passed:
+                        return {"status": "error"}
+
+                    if bypass_urls:
+                        bypass_target = random.choice(bypass_urls)
+                        try:
+                            bp_timeout = aiohttp.ClientTimeout(total=4.0)
+                            async with session.get(bypass_target, allow_redirects=True, timeout=bp_timeout) as bp_resp:
+                                if bp_resp.status not in (200, 301, 302, 304, 403):
+                                    logger.debug(f"BatchEngine: Ping {node.config.server} отклонён (DPI Block - HTTP {bp_resp.status} на {bypass_target})")
+                                    return {"status": "error"}
+                                
+                                await bp_resp.content.read(64)
+                        except Exception as e:
+                            logger.debug(f"BatchEngine: Ping {node.config.server} отклонён (DPI Block/Timeout на {bypass_target}): {e}")
+                            return {"status": "error"}
+
+                    latency = int((time.perf_counter() - t0) * 1000)
+                    if latency > max_latency: 
+                        return {"status": "high_latency"}
+                    
+                    logger.debug(f"BatchEngine: Ping {node.config.server} успешен (Latency {latency}ms, Bypass Verified)")
+                    return {"status": "ok", "node": node, "port": port, "latency": latency}
                             
         except Exception as e:
-            logger.debug(f"BatchEngine: Критическая ошибка Ping фазы: {e}")
             return {"status": "error"}
 
     async def _speed_phase(self, node_data: dict, is_champion: bool) -> dict:
@@ -635,6 +678,8 @@ class BatchEngine:
         return alive_nodes
 
 class Inspector:
+    _SNI_CACHE: dict = {}
+
     def __init__(self):
         self.batch_engine = BatchEngine()
         self.batch_semaphore = asyncio.Semaphore(2) 
@@ -645,6 +690,24 @@ class Inspector:
         if node.protocol in ("hysteria2", "quic"):
             return node
             
+        if node.config.security == "reality":
+            sni = node.config.sni or node.config.host or node.config.server
+            if sni:
+                clean_sni = sni.strip("[]")
+                if clean_sni not in Inspector._SNI_CACHE:
+                    try:
+                        fut = asyncio.open_connection(clean_sni, 443)
+                        _, w = await asyncio.wait_for(fut, timeout=2.0)
+                        w.close()
+                        try: await w.wait_closed() except: pass
+                        Inspector._SNI_CACHE[clean_sni] = True
+                    except Exception:
+                        Inspector._SNI_CACHE[clean_sni] = False
+                        logger.debug(f"Inspector: Донор Reality '{clean_sni}' МЕРТВ. Узел отбракован.")
+                        return None
+                elif Inspector._SNI_CACHE[clean_sni] is False:
+                    return None
+
         async with sem:
             host = node.config.server.strip("[]")
             port = node.config.port
@@ -715,8 +778,10 @@ class Inspector:
 
     async def process_all(self, nodes: List[ProxyNode]) -> List[ProxyNode]:
         total_initial = len(nodes)
-        logger.info(f"Inspector: Старт L4 Пре-фильтрации для {total_initial} узлов")
         
+        await BatchEngine.validate_bypass_urls()
+        
+        logger.info(f"Inspector: Старт L4 Пре-фильтрации для {total_initial} узлов")
         l4_sem = asyncio.Semaphore(75)
         chunk_size = 500
         valid_nodes =[]
@@ -743,7 +808,7 @@ class Inspector:
         total_batches = (total + batch_size - 1) // batch_size
         logger.info(f"Inspector: Генерация {total_batches} батчей (Размер: {batch_size})")
 
-        tasks =[]
+        tasks = []
         for i in range(0, total, batch_size):
             batch = nodes[i: i + batch_size]
             batch_num = i // batch_size + 1
