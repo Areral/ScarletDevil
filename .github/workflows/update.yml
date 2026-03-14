@@ -61,6 +61,7 @@ jobs:
           path: |
             data/sub_*.txt
             data/stats_*.json
+            data/*.log
           retention-days: 1
 
   matrix-merge:
