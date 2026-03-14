@@ -45,7 +45,8 @@ class ProxyNode(BaseModel):
     @property
     def strict_id(self) -> str:
         ident = self.config.uuid or self.config.password or "anon"
-        return f"{self.protocol}:{self.config.server}:{self.config.port}:{ident}"
+        mut = self.config.raw_meta.get("mutated", "original")
+        return f"{self.protocol}:{self.config.server}:{self.config.port}:{ident}:{mut}"
 
     @property
     def machine_id(self) -> str:
