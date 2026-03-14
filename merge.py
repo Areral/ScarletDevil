@@ -42,12 +42,16 @@ async def send_telegram_report(stats: dict):
         "disable_web_page_preview": True
     }
     
-    if CONFIG.TG_TOPIC_ID: 
+    target_topic = 7
+    if CONFIG.TG_TOPIC_ID:
         try:
-            payload["message_thread_id"] = int(CONFIG.TG_TOPIC_ID)
-            logger.debug(f"Nexus: Привязка сообщения к топику (message_thread_id={payload['message_thread_id']})")
+            target_topic = int(CONFIG.TG_TOPIC_ID)
         except ValueError:
-            logger.error(f"Nexus: ОШИБКА! Неверный формат TG_TOPIC_ID ('{CONFIG.TG_TOPIC_ID}'). Ожидалось целое число.")
+            logger.error(f"Nexus: ОШИБКА! Неверный формат TG_TOPIC_ID ('{CONFIG.TG_TOPIC_ID}'). Применяется Fallback: 7.")
+            target_topic = 7
+
+    payload["message_thread_id"] = target_topic
+    logger.debug(f"Nexus: Привязка сообщения к топику (message_thread_id={payload['message_thread_id']})")
             
     url = f"https://api.telegram.org/bot{CONFIG.TG_BOT_TOKEN}/sendMessage"
     
