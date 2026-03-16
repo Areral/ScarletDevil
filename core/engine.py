@@ -33,15 +33,14 @@ USER_AGENTS =[
 ]
 
 def _safe_exc(fut):
-    """Глушитель для осиротевших asyncio-задач (предотвращает спам gaierror в консоль)"""
     try:
-        fut.exception()
-    except Exception:
+        if not fut.cancelled():
+            fut.exception()
+    except BaseException:
         pass
 
 def _chunk_list(lst: List[Any], n: int) -> List[List[Any]]:
-    """Разбивает список на жесткие секвенциальные блоки (чанки) заданного размера"""
-    return [lst[i:i + n] for i in range(0, len(lst), n)]
+    return[lst[i:i + n] for i in range(0, len(lst), n)]
 
 class BatchEngine:
     _GEO_CACHE: dict = {}
@@ -108,7 +107,7 @@ class BatchEngine:
     @staticmethod
     def _generate_batch_config(nodes: List[ProxyNode], base_port: int) -> dict:
         inbounds = []
-        outbounds =[]
+        outbounds = []
         
         rules =[
             {"protocol": "dns", "outbound": "direct"},
@@ -259,7 +258,7 @@ class BatchEngine:
                 if c.alpn:
                     tls["alpn"] =[x.strip() for x in c.alpn.split(",") if x.strip()]
                 elif c.security in ("reality", "tls"):
-                    tls["alpn"] =["h2", "http/1.1"]
+                    tls["alpn"] = ["h2", "http/1.1"]
 
                 if c.security == "reality":
                     clean_pbk = c.pbk or ""
@@ -329,7 +328,6 @@ class BatchEngine:
         headers = {"User-Agent": random.choice(USER_AGENTS)}
         
         max_latency = min(CONFIG.checking.get("max_latency", 5000), 5000)
-        
         test_urls = random.sample(CONFIG.checking.get("connectivity_urls",["http://www.gstatic.com/generate_204"]), 2)
 
         try:
@@ -544,7 +542,7 @@ class BatchEngine:
                 alive_nodes =[]
 
                 for chunk in speed_chunks:
-                    chunk_tasks = [self._speed_phase(vp, is_champion) for vp in chunk]
+                    chunk_tasks =[self._speed_phase(vp, is_champion) for vp in chunk]
                     chunk_results = await asyncio.gather(*chunk_tasks, return_exceptions=True)
                     
                     for res in chunk_results:
@@ -657,7 +655,7 @@ class Inspector:
     async def _process_batch(self, batch: List[ProxyNode], batch_num: int, total_batches: int) -> List[ProxyNode]:
         results = await self.batch_engine.check_batch(batch, batch_num=batch_num)
         if batch_num % 5 == 0 or batch_num == total_batches:
-            logger.info(f"► [ИНСПЕКЦИЯ L7]: Батч {batch_num}/{total_batches} завершен (Выжило: {len(results)})")
+            logger.info(f"►[ИНСПЕКЦИЯ L7]: Батч {batch_num}/{total_batches} завершен (Выжило: {len(results)})")
         return results
 
     async def process_all(self, nodes: List[ProxyNode]) -> List[ProxyNode]:
@@ -685,7 +683,7 @@ class Inspector:
         logger.info(f"✔[ФИЛЬТРАЦИЯ L4]: Завершено. Отбраковано: {self.l4_dropped} | Передано в Sing-box: {total}")
         
         if not nodes:
-            return []
+            return[]
 
         alive_total: List[ProxyNode] =[]
         batch_size = min(getattr(CONFIG, "BATCH_SIZE", 100), 100)
