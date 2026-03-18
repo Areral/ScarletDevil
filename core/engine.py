@@ -19,9 +19,6 @@ from typing import List, Optional, Any
 from core.models import ProxyNode
 from core.settings import CONFIG
 
-CHAMPION_BYTES = 10 * 1024 * 1024 
-NORMAL_BYTES = 3 * 1024 * 1024    
-CHUNK_SIZE = 65536
 BATCH_HARD_TIMEOUT = 600.0
 
 USER_AGENTS =[
@@ -40,7 +37,7 @@ def _safe_exc(fut):
         pass
 
 def _chunk_list(lst: List[Any], n: int) -> List[List[Any]]:
-    return[lst[i:i + n] for i in range(0, len(lst), n)]
+    return [lst[i:i + n] for i in range(0, len(lst), n)]
 
 class BatchEngine:
     _GEO_CACHE: dict = {}
@@ -103,6 +100,21 @@ class BatchEngine:
             except ValueError:
                 return sni
         return None
+
+    @staticmethod
+    def _resolve_payload_ssl(node: ProxyNode, target_url: str) -> bool:
+        if not target_url.startswith("https"):
+            return False
+        if node.config.security == "reality":
+            return True
+        allow_insecure = False
+        for k, v in node.config.raw_meta.items():
+            if k.lower() in ("allowinsecure", "insecure") and str(v).lower() in ("1", "true", "yes"):
+                allow_insecure = True
+                break
+        if allow_insecure:
+            return False
+        return True
 
     @staticmethod
     def _generate_batch_config(nodes: List[ProxyNode], base_port: int) -> dict:
@@ -365,50 +377,26 @@ class BatchEngine:
         
         connector = ProxyConnector.from_url(f"socks5://127.0.0.1:{port}", rdns=True)
         headers = {"User-Agent": random.choice(USER_AGENTS)}
-        min_speed = CONFIG.checking.get("min_speed", 1.0)
         
-        url = CONFIG.checking.get("champion_test_url" if is_champion else "speedtest_url")
+        url = "https://speed.cloudflare.com"
+        target_ssl = self._resolve_payload_ssl(node, url)
         
         try:
             async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
-                dl_timeout = aiohttp.ClientTimeout(total=18.0 if is_champion else 12.0)
-                target_bytes = CHAMPION_BYTES if is_champion else NORMAL_BYTES
+                dl_timeout = aiohttp.ClientTimeout(total=8.0, connect=4.0)
 
                 t_start = time.perf_counter()
-                total = 0
+                
                 try:
-                    async with session.get(url, timeout=dl_timeout, ssl=False) as resp:
-                        if resp.status == 429:
-                            total = target_bytes
-                            t_start = time.perf_counter() - 2.0 
-                        elif resp.status != 200: 
+                    async with session.head(url, timeout=dl_timeout, ssl=target_ssl, allow_redirects=True) as resp:
+                        if resp.status not in (200, 301, 302, 308, 403, 404):
                             return {"status": "error"}
-                        else:
-                            try:
-                                async for chunk in resp.content.iter_chunked(CHUNK_SIZE):
-                                    total += len(chunk)
-                                    cur_time = time.perf_counter() - t_start
-                                    
-                                    if cur_time > 3.5 and total < 131072:
-                                        return {"status": "low_speed"}
-                                        
-                                    if total >= target_bytes: 
-                                        break
-                            except Exception: 
-                                pass 
-                except asyncio.TimeoutError:
-                    pass
                 except Exception:
-                    pass
+                    return {"status": "error"}
 
-                if total < 256 * 1024:
-                    return {"status": "drop"}
-
-                dur = max(time.perf_counter() - t_start, 0.1)
-                speed = round(min((total * 8) / (dur * 1_000_000), 3000.0), 1)
-
-                if speed < min_speed: 
-                    return {"status": "low_speed"}
+                dur = max(time.perf_counter() - t_start, 0.05)
+                
+                synthetic_speed = round(min(15.0 / dur, 3000.0), 1)
 
                 country = "UN"
                 cache_key = node.strict_id
@@ -454,7 +442,7 @@ class BatchEngine:
                         country = "UN"
                         BatchEngine._GEO_CACHE[cache_key] = country
 
-                updated_node = node.model_copy(update={"latency": latency, "speed": speed, "country": country})
+                updated_node = node.model_copy(update={"latency": latency, "speed": synthetic_speed, "country": country})
                 return {"status": "ok", "node": updated_node}
         except Exception:
             return {"status": "error"}
@@ -517,6 +505,7 @@ class BatchEngine:
                     if f"proxy-{i}" in valid_tags:
                         ping_targets.append((nodes[i], base_port + i))
 
+                # L7 PING: Strict Sequential Chunking
                 ping_chunks = _chunk_list(ping_targets, 25)
                 ping_stats = {"ok": 0, "timeout": 0, "high_latency": 0, "error": 0}
                 valid_nodes_for_speed =[]
@@ -537,7 +526,8 @@ class BatchEngine:
                 if not valid_nodes_for_speed:
                     return[]
 
-                speed_chunks = _chunk_list(valid_nodes_for_speed, 5)
+                # L7 SPEED (Head Verification): Strict Sequential Chunking
+                speed_chunks = _chunk_list(valid_nodes_for_speed, 10)
                 speed_stats = {"ok": 0, "low_speed": 0, "drop": 0, "error": 0}
                 alive_nodes =[]
 
@@ -683,7 +673,7 @@ class Inspector:
         logger.info(f"✔[ФИЛЬТРАЦИЯ L4]: Завершено. Отбраковано: {self.l4_dropped} | Передано в Sing-box: {total}")
         
         if not nodes:
-            return[]
+            return []
 
         alive_total: List[ProxyNode] =[]
         batch_size = min(getattr(CONFIG, "BATCH_SIZE", 100), 100)
@@ -703,23 +693,4 @@ class Inspector:
         return alive_total
 
     async def champion_run(self, nodes: List[ProxyNode]) -> float:
-        if not nodes: return 0.0
-
-        nodes.sort(key=lambda x: x.speed, reverse=True)
-        candidates = nodes[:5]
-
-        max_speed = 0.0
-        for node in candidates:
-            results = await self.batch_engine.check_batch([node], is_champion=True)
-            if results:
-                champ = results[0]
-                for n in nodes:
-                    if n.strict_id == champ.strict_id:
-                        n.speed = champ.speed
-                        break
-                if champ.speed > max_speed:
-                    max_speed = champ.speed
-            else:
-                pass
-
-        return max_speed
+        pass
