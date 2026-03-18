@@ -1,3 +1,4 @@
+# --- START OF FILE merge.py ---
 import os
 import json
 import glob

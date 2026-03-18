@@ -1,3 +1,4 @@
+# --- START OF FILE core/parser.py ---
 import base64
 import json
 import urllib.parse

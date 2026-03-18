@@ -21,9 +21,10 @@ checking:
     - "http://edge-http.microsoft.com/captiveportal/generate_204"
     - "http://connectivitycheck.gstatic.com/generate_204"
     
-  # = Тестовые файлы для замера скорости (3MB - Обычный, 10MB - Чемпион) =
-  speedtest_url: "https://speed.cloudflare.com/__down?bytes=5000000"
-  champion_test_url: "https://speed.cloudflare.com/__down?bytes=20000000"
+  # = Lightweight Head-URL для массового замера синтетической скорости =
+  speedtest_url: "https://speed.cloudflare.com"
+  # = Тестовые файлы для замера скорости Топ-5 Чемпионов (50MB) =
+  champion_test_url: "https://speed.cloudflare.com/__down?bytes=50000000"
   
   # = Минимальная скорость в Mbps для пропуска узла в финальный лист =
   min_speed: 1.0
@@ -47,8 +48,5 @@ whitelist:
     - "https://raw.githubusercontent.com/whoahaow/rjsxrd/refs/heads/main/source/config/cidrwhitelist.txt"
     - "https://raw.githubusercontent.com/hxehex/russia-mobile-internet-whitelist/refs/heads/main/cidrwhitelist.txt"
 
-# ==============================
-# ОРКЕСТРАЦИЯ НАГРУЗКИ SING-BOX
-# ==============================
-
+# = Размер батча для локального Sing-box =
 BATCH_SIZE: 100

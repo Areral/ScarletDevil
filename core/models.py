@@ -1,3 +1,4 @@
+# --- START OF FILE core/models.py ---
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, Any
 

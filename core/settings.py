@@ -1,3 +1,4 @@
+# --- START OF FILE core/settings.py ---
 import os
 import sys
 import yaml

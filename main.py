@@ -1,3 +1,4 @@
+# --- START OF FILE main.py ---
 import asyncio
 import time
 import sys
