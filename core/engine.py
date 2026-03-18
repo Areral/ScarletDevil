@@ -2,26 +2,252 @@
 import asyncio
 import json
 import os
-import subprocess
+import re
+import base64
 import uuid
+import time
+import ipaddress
+import random
+import subprocess
+import sys
+import aiohttp
 from loguru import logger
-from typing import List
+from typing import List, Optional, Any
+
 from core.models import ProxyNode
 from core.settings import CONFIG
+
+class BatchEngine:
+    _GEO_CACHE: dict = {}
+
+    @staticmethod
+    def _is_valid_uuid(val: str) -> bool:
+        try:
+            uuid.UUID(str(val))
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _is_valid_hex(val: str) -> bool:
+        return bool(re.fullmatch(r'^[0-9a-fA-F]*$', val))
+
+    @staticmethod
+    def _validate_reality_node(c) -> bool:
+        sni = c.sni or c.host
+        if not sni: return False
+        try:
+            ipaddress.ip_address(sni.strip("[]"))
+            return False
+        except ValueError:
+            pass
+        return len(sni) >= 4 and "." in sni
+
+    @staticmethod
+    def _resolve_tls_sni(c, transport_type: str) -> Optional[str]:
+        sni = c.sni
+        if not sni and transport_type not in ("ws", "httpupgrade", "xhttp", "http", "h2"):
+            sni = c.host
+        if not sni: sni = c.server
+            
+        if sni:
+            sni = sni.strip("[]")
+            try:
+                ipaddress.ip_address(sni)
+                return None
+            except ValueError:
+                return sni
+        return None
+
+    @staticmethod
+    def _node_to_outbound(node: ProxyNode, tag: str) -> Optional[dict]:
+        c = node.config
+        base = {"tag": tag, "server": c.server, "server_port": c.port}
+
+        try:
+            if node.protocol == "vless":
+                if not c.uuid or not BatchEngine._is_valid_uuid(c.uuid): return None
+                base.update({"type": "vless", "uuid": c.uuid})
+                if c.flow:
+                    base["flow"] = c.flow
+
+            elif node.protocol == "vmess":
+                if not c.uuid or not BatchEngine._is_valid_uuid(c.uuid): return None
+                base.update({
+                    "type": "vmess",
+                    "uuid": c.uuid,
+                    "security": "auto",
+                    "alter_id": c.alter_id,
+                })
+
+            elif node.protocol == "trojan":
+                if not c.password: return None
+                base.update({"type": "trojan", "password": c.password})
+
+            elif node.protocol == "ss":
+                if not c.method or not c.password: return None
+                base.update({
+                    "type": "shadowsocks",
+                    "method": c.method.lower(),
+                    "password": c.password,
+                })
+
+            elif node.protocol == "hysteria2":
+                if not c.password: return None
+                base.update({"type": "hysteria2", "password": c.password})
+                if c.obfs and c.obfs_password:
+                    base["obfs"] = {"type": c.obfs, "password": c.obfs_password}
+                
+                sni = BatchEngine._resolve_tls_sni(c, "hysteria2")
+                
+                allow_insecure = False
+                for k, v in c.raw_meta.items():
+                    if k.lower() in ("allowinsecure", "insecure"):
+                        if str(v).lower() in ("1", "true", "yes"):
+                            allow_insecure = True
+                            break
+
+                tls_config = {"enabled": True}
+                if allow_insecure:
+                    tls_config["insecure"] = True
+
+                if sni: tls_config["server_name"] = sni
+                base["tls"] = tls_config
+                return base
+
+            if c.type in ("ws", "websocket"):
+                base["transport"] = {"type": "ws", "path": c.path or "/"}
+                if c.host: base["transport"]["headers"] = {"Host": c.host}
+            elif c.type == "grpc":
+                base["transport"] = {"type": "grpc", "service_name": c.service_name or c.path or ""}
+            elif c.type in ("httpupgrade", "xhttp"):
+                base["transport"] = {"type": "httpupgrade", "path": c.path or "/"}
+                if c.host: base["transport"]["host"] = c.host
+            elif c.type in ("http", "h2"):
+                base["transport"] = {"type": "http", "path": c.path or "/"}
+                if c.host: base["transport"]["host"] =[h.strip() for h in c.host.split(",") if h.strip()]
+            elif c.type == "quic":
+                base["transport"] = {"type": "quic"}
+
+            if c.security in ("tls", "reality", "auto"):
+                if c.security == "reality" and not BatchEngine._validate_reality_node(c): return None
+                
+                export_sni = BatchEngine._resolve_tls_sni(c, c.type)
+                if not export_sni and c.security == "reality": return None
+
+                tls = {"enabled": True}
+
+                if c.security == "tls":
+                    tls["insecure"] = True
+                elif c.security == "reality":
+                    tls["insecure"] = False
+
+                if c.security != "reality":
+                    for k, v in c.raw_meta.items():
+                        if k.lower() in ("allowinsecure", "insecure"):
+                            if str(v).lower() in ("1", "true", "yes"):
+                                tls["insecure"] = True
+
+                if c.fp:
+                    clean_fp = c.fp.lower()
+                    if clean_fp in {"chrome", "firefox", "edge", "safari", "360", "qq", "ios", "android", "random", "randomized"}:
+                        tls["utls"] = {"enabled": True, "fingerprint": clean_fp}
+                elif c.security in ("reality", "tls"):
+                    tls["utls"] = {"enabled": True, "fingerprint": "chrome"}
+
+                if export_sni: tls["server_name"] = export_sni
+
+                if c.alpn:
+                    tls["alpn"] =[x.strip() for x in c.alpn.split(",") if x.strip()]
+                elif c.security in ("reality", "tls"):
+                    tls["alpn"] =["h2", "http/1.1"]
+
+                if c.security == "reality":
+                    clean_pbk = c.pbk or ""
+                    if len(clean_pbk) < 40 or len(clean_pbk) > 46: return None
+                    try:
+                        decoded = base64.urlsafe_b64decode(clean_pbk + '=' * (-len(clean_pbk) % 4))
+                        if len(decoded) != 32: return None
+                    except Exception: 
+                        return None
+                    
+                    tls["reality"] = {"enabled": True, "public_key": clean_pbk}
+                    if c.sid:
+                        if not BatchEngine._is_valid_hex(c.sid) or len(c.sid) > 16 or len(c.sid) % 2 != 0: return None
+                        tls["reality"]["short_id"] = c.sid
+                    else:
+                        tls["reality"]["short_id"] = ""
+
+                base["tls"] = tls
+
+            return base
+
+        except Exception:
+            return None
 
 class Inspector:
     def __init__(self):
         self.l4_dropped = 0
 
+    async def _resolve_geo(self, nodes: List[ProxyNode]):
+        logger.info("► [GEOIP]: Присвоение флагов стран выжившим узлам...")
+        
+        async def fetch_geo(ip: str, session: aiohttp.ClientSession) -> str:
+            if ip in BatchEngine._GEO_CACHE:
+                return BatchEngine._GEO_CACHE[ip]
+                
+            geo_services =[
+                f"http://ip-api.com/json/{ip}",
+                f"https://freeipapi.com/api/json/{ip}"
+            ]
+            
+            for url in geo_services:
+                try:
+                    async with session.get(url, timeout=3.0) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            country = data.get("countryCode", data.get("countryCode", "UN"))
+                            if len(country) == 2:
+                                BatchEngine._GEO_CACHE[ip] = country.upper()
+                                return country.upper()
+                except Exception:
+                    pass
+            return "UN"
+
+        async with aiohttp.ClientSession() as session:
+            for node in nodes:
+                try:
+                    host = node.config.server.strip("[]")
+                    try:
+                        ipaddress.ip_address(host)
+                        ip = host
+                    except ValueError:
+                        ip = socket.gethostbyname(host)
+                        
+                    node.country = await fetch_geo(ip, session)
+                    await asyncio.sleep(0.05)
+                except Exception:
+                    node.country = "UN"
+
     async def process_all(self, nodes: List[ProxyNode]) -> List[ProxyNode]:
         total_initial = len(nodes)
-        logger.info(f"► [ANGRA ORCHESTRATOR]: Передача {total_initial} узлов в Go-Ядро (ANGRA-CORE)...")
+        
+        payload_nodes =[]
+        for n in nodes:
+            outbound = BatchEngine._node_to_outbound(n, "placeholder")
+            if outbound:
+                dump = n.model_dump(by_alias=True)
+                dump["ready_outbound"] = outbound
+                payload_nodes.append(dump)
+            else:
+                self.l4_dropped += 1
+                
+        logger.info(f"►[ANGRA ORCHESTRATOR]: Передача {len(payload_nodes)} подготовленных узлов в Go-Ядро...")
         
         os.makedirs("data", exist_ok=True)
         input_file = f"data/go_in_{uuid.uuid4().hex[:8]}.json"
         output_file = f"data/go_out_{uuid.uuid4().hex[:8]}.json"
-        
-        nodes_data =[n.model_dump(by_alias=True) for n in nodes]
+
         payload = {
             "settings": {
                 "max_latency": CONFIG.checking.get("max_latency", 5000),
@@ -31,7 +257,7 @@ class Inspector:
                 "champion_test_url": CONFIG.checking.get("champion_test_url", "https://speed.cloudflare.com/__down?bytes=50000000"),
                 "batch_size": getattr(CONFIG, "BATCH_SIZE", 100)
             },
-            "nodes": nodes_data
+            "nodes": payload_nodes
         }
         
         with open(input_file, "w", encoding="utf-8") as f:
@@ -40,15 +266,12 @@ class Inspector:
         try:
             ext = ".exe" if os.name == "nt" else ""
             if not os.path.exists(f"go_core/angra_core{ext}"):
-                logger.info("⚙ [GOLANG]: Инициализация модулей и компиляция ANGRA-CORE...")
-                
-                subprocess.run(["go", "get", "golang.org/x/net/proxy"], cwd="go_core", check=True)
+                logger.info("⚙ [GOLANG]: Компиляция ANGRA-CORE (go build)...")
                 subprocess.run(["go", "mod", "tidy"], cwd="go_core", check=True)
-                
+
                 subprocess.run(["go", "build", "-o", f"angra_core{ext}", "main.go"], cwd="go_core", check=True)
             
-            logger.info("⚡ [GOLANG]: Запуск сетевого пайплайна (L4 -> L7 -> Champion)...")
-            
+            logger.info("⚡[GOLANG]: Запуск сетевого пайплайна (L4 -> L7 -> Champion)...")
             proc = await asyncio.create_subprocess_exec(
                 f"./angra_core{ext}", f"../{input_file}", f"../{output_file}",
                 cwd="go_core",
@@ -63,15 +286,18 @@ class Inspector:
                     
             if proc.returncode != 0:
                 logger.error(f"✘ [GOLANG CRASH]: {stderr.decode()}")
-                return []
+                return[]
                 
             with open(output_file, "r", encoding="utf-8") as f:
                 valid_nodes_data = json.load(f)
                 
-            valid_nodes =[ProxyNode(**data) for data in valid_nodes_data]
+            valid_nodes =[]
+            for data in valid_nodes_data:
+                data.pop("ready_outbound", None)
+                valid_nodes.append(ProxyNode(**data))
             
         except Exception as e:
-            logger.exception(f"✘ [СБОЙ ИНТЕГРАЦИИ GO]: {e}. Убедитесь, что 'go' установлен и доступен в PATH.")
+            logger.exception(f"✘ [СБОЙ ИНТЕГРАЦИИ GO]: {e}.")
             return[]
         finally:
             if os.path.exists(input_file): os.remove(input_file)
@@ -81,6 +307,9 @@ class Inspector:
         total = len(nodes)
 
         self.l4_dropped += (total_initial - total)
+
+        if nodes:
+            await self._resolve_geo(nodes)
 
         logger.info(f"✔ [ANGRA ORCHESTRATOR]: Инспекция полностью завершена. Итого выжило: {total}")
         return valid_nodes
