@@ -33,22 +33,7 @@ type ProxyConfig struct {
 	Server       string                 `json:"server"`
 	Port         int                    `json:"port"`
 	Type         string                 `json:"type"`
-	UUID         string                 `json:"uuid,omitempty"`
-	Password     string                 `json:"password,omitempty"`
-	Method       string                 `json:"method,omitempty"`
 	Security     string                 `json:"security,omitempty"`
-	Path         string                 `json:"path,omitempty"`
-	Host         string                 `json:"host,omitempty"`
-	SNI          string                 `json:"sni,omitempty"`
-	FP           string                 `json:"fp,omitempty"`
-	ALPN         string                 `json:"alpn,omitempty"`
-	PBK          string                 `json:"pbk,omitempty"`
-	SID          string                 `json:"sid,omitempty"`
-	Flow         string                 `json:"flow,omitempty"`
-	ServiceName  string                 `json:"serviceName,omitempty"`
-	Aid          int                    `json:"aid,omitempty"`
-	Obfs         string                 `json:"obfs,omitempty"`
-	ObfsPassword string                 `json:"obfs-password,omitempty"`
 	RawMeta      map[string]interface{} `json:"raw_meta,omitempty"`
 }
 
@@ -65,8 +50,8 @@ type ProxyNode struct {
 }
 
 type InputPayload struct {
-	Settings EngineSettings `json:"settings"`
-	Nodes[]ProxyNode    `json:"nodes"`
+	Settings EngineSettings           `json:"settings"`
+	Nodes   []map[string]interface{} `json:"nodes"`
 }
 
 var (
@@ -142,8 +127,8 @@ func main() {
 	os.WriteFile(os.Args[2], outData, 0644)
 }
 
-func runL4Phase(nodes []ProxyNode) []ProxyNode {
-	validNodes := make([]ProxyNode, 0)
+func runL4Phase(nodes []map[string]interface{}) []map[string]interface{} {
+	validNodes := make([]map[string]interface{}, 0)
 	var mu sync.Mutex
 
 	sem := make(chan struct{}, 75)
@@ -159,7 +144,7 @@ func runL4Phase(nodes []ProxyNode) []ProxyNode {
 		var wg sync.WaitGroup
 		for _, node := range chunk {
 			wg.Add(1)
-			go func(n ProxyNode) {
+			go func(n map[string]interface{}) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
@@ -176,12 +161,22 @@ func runL4Phase(nodes []ProxyNode) []ProxyNode {
 	return validNodes
 }
 
-func checkL4(node ProxyNode) bool {
-	if node.Protocol == "hysteria2" || node.Protocol == "quic" {
+func checkL4(node map[string]interface{}) bool {
+	protocol, _ := node["protocol"].(string)
+	if protocol == "hysteria2" || protocol == "quic" {
 		return true
 	}
-	host := strings.Trim(node.Config.Server, "[]")
-	port := node.Config.Port
+
+	config, ok := node["config"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	hostRaw, _ := config["server"].(string)
+	host := strings.Trim(hostRaw, "[]")
+	portFloat, _ := config["port"].(float64)
+	port := int(portFloat)
+	nodeType, _ := config["type"].(string)
 
 	var targetIP net.IP
 	parsedIP := net.ParseIP(host)
@@ -210,7 +205,7 @@ func checkL4(node ProxyNode) bool {
 		return false
 	}
 
-	nt := strings.ToLower(node.Config.Type)
+	nt := strings.ToLower(nodeType)
 	isCdnAllowed := nt == "ws" || nt == "websocket" || nt == "httpupgrade" || nt == "xhttp" || nt == "grpc"
 	if !isCdnAllowed {
 		for _, network := range forbiddenNetworks {
@@ -235,14 +230,13 @@ func checkL4(node ProxyNode) bool {
 	return true
 }
 
-func runL7Phase(nodes []ProxyNode)[]ProxyNode {
+func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 	batchSize := globalSettings.BatchSize
 	if batchSize <= 0 {
 		batchSize = 100
 	}
 	totalBatches := (len(nodes) + batchSize - 1) / batchSize
-	
-	finalNodes := make([]ProxyNode, 0)
+	finalNodes := make([]map[string]interface{}, 0)
 
 	for i := 0; i < len(nodes); i += batchSize {
 		end := i + batchSize
@@ -264,17 +258,7 @@ func runL7Phase(nodes []ProxyNode)[]ProxyNode {
 	return finalNodes
 }
 
-func isConfigValid(configBytes[]byte) bool {
-	configPath := fmt.Sprintf("check_%d.json", rand.Intn(100000))
-	os.WriteFile(configPath, configBytes, 0644)
-	defer os.Remove(configPath)
-
-	cmd := exec.Command("sing-box", "check", "-c", configPath)
-	err := cmd.Run()
-	return err == nil
-}
-
-func processSingboxBatch(batch []ProxyNode, isChampion bool)[]ProxyNode {
+func processSingboxBatch(batch[]map[string]interface{}, isChampion bool) []map[string]interface{} {
 	basePort := getNextBasePort(len(batch))
 	inbounds := make([]map[string]interface{}, 0)
 	outbounds := make([]map[string]interface{}, 0)
@@ -283,21 +267,23 @@ func processSingboxBatch(batch []ProxyNode, isChampion bool)[]ProxyNode {
 		{"ip_cidr":[]string{"127.0.0.0/8", "10.0.0.0/8", "192.168.0.0/16", "172.16.0.0/12", "::1/128", "fc00::/7", "fe80::/10"}, "outbound": "block"},
 	}
 
-	validMap := make(map[int]ProxyNode)
+	validMap := make(map[int]map[string]interface{})
 
 	for i, node := range batch {
-		tag := fmt.Sprintf("proxy-%d", i)
-		ob := buildOutbound(node, tag)
-		if ob == nil {
+		readyOutbound, ok := node["ready_outbound"].(map[string]interface{})
+		if !ok {
 			continue
 		}
+
+		tag := fmt.Sprintf("proxy-%d", i)
+		readyOutbound["tag"] = tag
 
 		localPort := basePort + i
 		inbounds = append(inbounds, map[string]interface{}{
 			"type": "socks", "tag": fmt.Sprintf("in-%d", i),
 			"listen": "127.0.0.1", "listen_port": localPort,
 		})
-		outbounds = append(outbounds, ob)
+		outbounds = append(outbounds, readyOutbound)
 		rules = append(rules, map[string]interface{}{
 			"inbound":[]string{fmt.Sprintf("in-%d", i)}, "outbound": tag,
 		})
@@ -324,11 +310,7 @@ func processSingboxBatch(batch []ProxyNode, isChampion bool)[]ProxyNode {
 	}
 
 	configBytes, _ := json.Marshal(configMap)
-
-	if !isConfigValid(configBytes) {
-		return nil
-	}
-
+	
 	configPath := fmt.Sprintf("run_%d.json", basePort)
 	os.WriteFile(configPath, configBytes, 0644)
 	defer os.Remove(configPath)
@@ -359,26 +341,24 @@ func processSingboxBatch(batch []ProxyNode, isChampion bool)[]ProxyNode {
 
 	var wgPing sync.WaitGroup
 	var mu sync.Mutex
-	pingPassed := make(map[int]ProxyNode)
+	pingPassed := make(map[int]map[string]interface{})
 	semPing := make(chan struct{}, 100)
 
-	delay := 0.0
 	for port, node := range validMap {
 		wgPing.Add(1)
 		semPing <- struct{}{}
 		
-		go func(p int, n ProxyNode, d float64) {
+		go func(p int, n map[string]interface{}) {
 			defer wgPing.Done()
 			defer func() { <-semPing }()
 			
-			if lat, ok := testHTTPPing(p, d); ok {
-				n.Latency = lat
+			if lat, ok := testHTTPPing(p); ok {
+				n["latency"] = lat
 				mu.Lock()
 				pingPassed[p] = n
 				mu.Unlock()
 			}
-		}(port, node, delay)
-		delay += 0.01
+		}(port, node)
 	}
 	wgPing.Wait()
 
@@ -387,20 +367,21 @@ func processSingboxBatch(batch []ProxyNode, isChampion bool)[]ProxyNode {
 	}
 
 	var wgSpeed sync.WaitGroup
-	alive := make([]ProxyNode, 0)
+	alive := make([]map[string]interface{}, 0)
 	semSpeed := make(chan struct{}, 6)
 
 	for port, node := range pingPassed {
 		wgSpeed.Add(1)
 		semSpeed <- struct{}{}
 		
-		go func(p int, n ProxyNode) {
+		go func(p int, n map[string]interface{}) {
 			defer wgSpeed.Done()
 			defer func() { <-semSpeed }()
 			
-			if speed, country, ok := testHTTPSpeed(p, n.StrictID, isChampion); ok {
-				n.Speed = speed
-				n.Country = country
+			strictID, _ := n["strict_id"].(string)
+			if speed, country, ok := testHTTPSpeed(p, strictID, isChampion); ok {
+				n["speed"] = speed
+				n["country"] = country
 				mu.Lock()
 				alive = append(alive, n)
 				mu.Unlock()
@@ -410,134 +391,6 @@ func processSingboxBatch(batch []ProxyNode, isChampion bool)[]ProxyNode {
 	wgSpeed.Wait()
 
 	return alive
-}
-
-func buildOutbound(n ProxyNode, tag string) map[string]interface{} {
-	c := n.Config
-	base := map[string]interface{}{
-		"tag": tag, "server": c.Server, "server_port": c.Port,
-	}
-
-	switch n.Protocol {
-	case "vless":
-		if c.UUID == "" { return nil }
-		base["type"] = "vless"
-		base["uuid"] = c.UUID
-		if c.Flow != "" { base["flow"] = c.Flow }
-	case "vmess":
-		if c.UUID == "" { return nil }
-		base["type"] = "vmess"
-		base["uuid"] = c.UUID
-		base["security"] = "auto"
-		base["alter_id"] = c.Aid
-	case "trojan":
-		base["type"] = "trojan"
-		base["password"] = c.Password
-	case "ss":
-		base["type"] = "shadowsocks"
-		base["method"] = strings.ToLower(c.Method)
-		base["password"] = c.Password
-	case "hysteria2":
-		base["type"] = "hysteria2"
-		base["password"] = c.Password
-		if c.Obfs != "" {
-			base["obfs"] = map[string]interface{}{"type": c.Obfs, "password": c.ObfsPassword}
-		}
-	default:
-		return nil
-	}
-
-	nt := strings.ToLower(c.Type)
-	if nt == "ws" || nt == "websocket" {
-		path := c.Path
-		if path == "" { path = "/" }
-		tr := map[string]interface{}{"type": "ws", "path": path}
-		if c.Host != "" { tr["headers"] = map[string]interface{}{"Host": c.Host} }
-		base["transport"] = tr
-	} else if nt == "grpc" {
-		sn := c.ServiceName
-		if sn == "" { sn = c.Path }
-		base["transport"] = map[string]interface{}{"type": "grpc", "service_name": sn}
-	} else if nt == "httpupgrade" || nt == "xhttp" {
-		path := c.Path
-		if path == "" { path = "/" }
-		tr := map[string]interface{}{"type": "httpupgrade", "path": path}
-		if c.Host != "" { tr["host"] = c.Host }
-		base["transport"] = tr
-	} else if nt == "http" || nt == "h2" {
-		path := c.Path
-		if path == "" { path = "/" }
-		tr := map[string]interface{}{"type": "http", "path": path}
-		if c.Host != "" {
-			hosts :=[]string{}
-			for _, h := range strings.Split(c.Host, ",") {
-				if strings.TrimSpace(h) != "" { hosts = append(hosts, strings.TrimSpace(h)) }
-			}
-			if len(hosts) > 0 { tr["host"] = hosts }
-		}
-		base["transport"] = tr
-	} else if nt == "quic" {
-		base["transport"] = map[string]interface{}{"type": "quic"}
-	}
-
-	sec := strings.ToLower(c.Security)
-	if sec == "tls" || sec == "reality" || sec == "auto" {
-		tlsConf := map[string]interface{}{"enabled": true}
-
-		if sec == "tls" {
-			tlsConf["insecure"] = true
-		} else if sec == "reality" {
-			tlsConf["insecure"] = false
-		}
-
-		if sec != "reality" {
-			for k, v := range c.RawMeta {
-				kl := strings.ToLower(k)
-				if kl == "allowinsecure" || kl == "insecure" {
-					vs := fmt.Sprintf("%v", v)
-					if vs == "1" || vs == "true" || vs == "yes" {
-						tlsConf["insecure"] = true
-					}
-				}
-			}
-		}
-
-		fp := strings.ToLower(c.FP)
-		validFp := map[string]bool{"chrome": true, "firefox": true, "edge": true, "safari": true, "360": true, "qq": true, "ios": true, "android": true, "random": true, "randomized": true}
-		if validFp[fp] {
-			tlsConf["utls"] = map[string]interface{}{"enabled": true, "fingerprint": fp}
-		} else if sec == "reality" || sec == "tls" {
-			tlsConf["utls"] = map[string]interface{}{"enabled": true, "fingerprint": "chrome"}
-		}
-
-		sni := c.SNI
-		if sni == "" && sec != "reality" { sni = c.Host }
-		if sni == "" && sec != "reality" { sni = c.Server }
-		if sni != "" {
-			cleanSni := strings.Trim(sni, "[]")
-			if net.ParseIP(cleanSni) == nil { tlsConf["server_name"] = cleanSni }
-		}
-
-		if c.ALPN != "" {
-			var alpns[]string
-			for _, a := range strings.Split(c.ALPN, ",") {
-				a = strings.TrimSpace(a)
-				if a != "" { alpns = append(alpns, a) }
-			}
-			if len(alpns) > 0 { tlsConf["alpn"] = alpns }
-		} else if sec == "reality" || sec == "tls" {
-			tlsConf["alpn"] =[]string{"h2", "http/1.1"}
-		}
-
-		if sec == "reality" {
-			if len(c.PBK) < 40 { return nil }
-			tlsConf["reality"] = map[string]interface{}{"enabled": true, "public_key": c.PBK, "short_id": c.SID}
-		}
-
-		base["tls"] = tlsConf
-	}
-
-	return base
 }
 
 func getSocksClient(port int, timeout time.Duration) *http.Client {
@@ -552,37 +405,49 @@ func getSocksClient(port int, timeout time.Duration) *http.Client {
 	return &http.Client{Transport: transport, Timeout: timeout}
 }
 
-func testHTTPPing(port int, delaySec float64) (int, bool) {
-	if delaySec > 0 {
-		time.Sleep(time.Duration(delaySec*float64(time.Second)))
+func testHTTPPing(port int) (int, bool) {
+	maxLatency := globalSettings.MaxLatency
+	if maxLatency <= 0 {
+		maxLatency = 5000
 	}
 
-	maxLatency := globalSettings.MaxLatency
-	if maxLatency <= 0 { maxLatency = 5000 }
-
 	urls := globalSettings.ConnectivityUrls
-	if len(urls) == 0 { urls =[]string{"http://www.gstatic.com/generate_204"} }
+	if len(urls) == 0 {
+		urls =[]string{"http://www.gstatic.com/generate_204"}
+	}
+	
 	rand.Shuffle(len(urls), func(i, j int) { urls[i], urls[j] = urls[j], urls[i] })
-	if len(urls) > 2 { urls = urls[:2] }
+	testUrls := urls
+	if len(testUrls) > 2 {
+		testUrls = testUrls[:2]
+	}
 
 	client := getSocksClient(port, 5*time.Second)
 	
 	t0 := time.Now()
-	for _, targetUrl := range urls {
+	for _, targetUrl := range testUrls {
 		req, _ := http.NewRequest("GET", targetUrl, nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
 
 		resp, err := client.Do(req)
-		if err != nil { continue }
+		if err != nil {
+			continue
+		}
 		
 		defer resp.Body.Close()
-		if resp.StatusCode != 204 { break }
+		if resp.StatusCode != 204 {
+			break
+		}
 		
 		body, _ := io.ReadAll(resp.Body)
-		if len(body) > 0 { break }
+		if len(body) > 0 {
+			break
+		}
 
 		lat := int(time.Since(t0).Milliseconds())
-		if lat > maxLatency { return 0, false }
+		if lat > maxLatency {
+			return 0, false
+		}
 		return lat, true
 	}
 	return 0, false
@@ -592,12 +457,16 @@ func testHTTPSpeed(port int, strictID string, isChampion bool) (float64, string,
 	timeout := 12 * time.Second
 	targetBytes := normalBytes
 	url := globalSettings.SpeedtestUrl
-	if url == "" { url = "https://speed.cloudflare.com/__down?bytes=5000000" }
+	if url == "" {
+		url = "https://speed.cloudflare.com/__down?bytes=5000000"
+	}
 
 	if isChampion {
 		timeout = 18 * time.Second
 		targetBytes = championBytes
-		if globalSettings.ChampionTestUrl != "" { url = globalSettings.ChampionTestUrl }
+		if globalSettings.ChampionTestUrl != "" {
+			url = globalSettings.ChampionTestUrl
+		}
 	}
 
 	client := getSocksClient(port, timeout)
@@ -620,24 +489,38 @@ func testHTTPSpeed(port int, strictID string, isChampion bool) (float64, string,
 				total += n
 				
 				dur := time.Since(tStart).Seconds()
-				if dur > 3.5 && total < 65536 { return 0, "UN", false }
-				if total >= targetBytes || errRead != nil { break }
+				if dur > 3.5 && total < 65536 {
+					return 0, "UN", false
+				}
+				if total >= targetBytes || errRead != nil {
+					break
+				}
 			}
 		} else {
 			return 0, "UN", false
 		}
 	}
 
-	if total < 256*1024 { return 0, "UN", false }
+	if total < 256*1024 {
+		return 0, "UN", false
+	}
 
 	dur := time.Since(tStart).Seconds()
-	if dur < 0.1 { dur = 0.1 }
+	if dur < 0.1 {
+		dur = 0.1
+	}
 	speed := (float64(total) * 8.0) / (dur * 1000000.0)
-	if speed > 3000.0 { speed = 3000.0 }
+	if speed > 3000.0 {
+		speed = 3000.0
+	}
 	
 	minSpeed := globalSettings.MinSpeed
-	if minSpeed <= 0 { minSpeed = 1.0 }
-	if speed < minSpeed { return 0, "UN", false }
+	if minSpeed <= 0 {
+		minSpeed = 1.0
+	}
+	if speed < minSpeed {
+		return 0, "UN", false
+	}
 
 	country := "UN"
 	if val, ok := geoCache.Load(strictID); ok {
@@ -658,6 +541,7 @@ func testHTTPSpeed(port int, strictID string, isChampion bool) (float64, string,
 				body, _ := io.ReadAll(r.Body)
 				r.Body.Close()
 				content := string(body)
+				
 				if strings.Contains(gUrl, "trace") {
 					lines := strings.Split(content, "\n")
 					for _, line := range lines {
@@ -681,17 +565,28 @@ func testHTTPSpeed(port int, strictID string, isChampion bool) (float64, string,
 		}
 	}
 
-	if country == "" || country == "XX" { country = "UN" }
+	if country == "" || country == "XX" {
+		country = "UN"
+	}
 	return speed, country, true
 }
 
-func runChampionPhase(nodes[]ProxyNode) {
-	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Speed > nodes[j].Speed })
+func runChampionPhase(nodes []map[string]interface{}) {
+	sort.Slice(nodes, func(i, j int) bool {
+		sI, _ := nodes[i]["speed"].(float64)
+		sJ, _ := nodes[j]["speed"].(float64)
+		return sI > sJ
+	})
+	
 	limit := 5
-	if len(nodes) < 5 { limit = len(nodes) }
+	if len(nodes) < 5 {
+		limit = len(nodes)
+	}
 	
 	for i := 0; i < limit; i++ {
-		res := processSingboxBatch([]ProxyNode{nodes[i]}, true)
-		if len(res) > 0 { nodes[i].Speed = res[0].Speed }
+		res := processSingboxBatch([]map[string]interface{}{nodes[i]}, true)
+		if len(res) > 0 {
+			nodes[i]["speed"] = res[0]["speed"]
+		}
 	}
 }
