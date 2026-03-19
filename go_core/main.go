@@ -2,10 +2,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -130,7 +128,7 @@ func main() {
 	nodes := payload.Nodes
 
 	l4Nodes := runL4Phase(nodes)
-	fmt.Printf("✔ [ФИЛЬТРАЦИЯ L4]: Завершено. Отбраковано: %d | Передано в Sing-box: %d\n", len(nodes)-len(l4Nodes), len(l4Nodes))
+	fmt.Printf("✔[ФИЛЬТРАЦИЯ L4]: Завершено. Отбраковано: %d | Передано в Sing-box: %d\n", len(nodes)-len(l4Nodes), len(l4Nodes))
 
 	if len(l4Nodes) == 0 {
 		os.WriteFile(os.Args[2], []byte("[]"), 0644)
@@ -151,7 +149,7 @@ func main() {
 // =========================================
 // L4 ФИЛЬТРАЦИЯ (Семафор 75, Джиттер 0.2с)
 // =========================================
-func runL4Phase(nodes []ProxyNode)[]ProxyNode {
+func runL4Phase(nodes []ProxyNode) []ProxyNode {
 	validNodes := make([]ProxyNode, 0)
 	var mu sync.Mutex
 
@@ -267,7 +265,7 @@ func runL7Phase(nodes []ProxyNode)[]ProxyNode {
 		finalNodes = append(finalNodes, survivors...)
 
 		if batchNum%5 == 0 || batchNum == totalBatches {
-			fmt.Printf("►[ИНСПЕКЦИЯ L7]: Батч %d/%d завершен (Выжило: %d)\n", batchNum, totalBatches, len(survivors))
+			fmt.Printf("► [ИНСПЕКЦИЯ L7]: Батч %d/%d завершен (Выжило: %d)\n", batchNum, totalBatches, len(survivors))
 		}
 	}
 	return finalNodes
@@ -283,7 +281,7 @@ func isConfigValid(configBytes[]byte) bool {
 	return err == nil
 }
 
-func processSingboxBatch(batch[]ProxyNode, isChampion bool) []ProxyNode {
+func processSingboxBatch(batch []ProxyNode, isChampion bool)[]ProxyNode {
 	basePort := getNextBasePort(len(batch))
 	inbounds := make([]map[string]interface{}, 0)
 	outbounds := make([]map[string]interface{}, 0)
@@ -423,16 +421,24 @@ func processSingboxBatch(batch[]ProxyNode, isChampion bool) []ProxyNode {
 
 func buildOutbound(n ProxyNode, tag string) map[string]interface{} {
 	c := n.Config
-	base := map[string]interface{}{"tag": tag, "server": c.Server, "server_port": c.Port}
+	base := map[string]interface{}{
+		"tag": tag, "server": c.Server, "server_port": c.Port,
+	}
 
 	switch n.Protocol {
 	case "vless":
-		if c.UUID == "" { return nil }
+		if c.UUID == "" {
+			return nil
+		}
 		base["type"] = "vless"
 		base["uuid"] = c.UUID
-		if c.Flow != "" { base["flow"] = c.Flow }
+		if c.Flow != "" {
+			base["flow"] = c.Flow
+		}
 	case "vmess":
-		if c.UUID == "" { return nil }
+		if c.UUID == "" {
+			return nil
+		}
 		base["type"] = "vmess"
 		base["uuid"] = c.UUID
 		base["security"] = "auto"
@@ -457,30 +463,46 @@ func buildOutbound(n ProxyNode, tag string) map[string]interface{} {
 	nt := strings.ToLower(c.Type)
 	if nt == "ws" || nt == "websocket" {
 		path := c.Path
-		if path == "" { path = "/" }
+		if path == "" {
+			path = "/"
+		}
 		tr := map[string]interface{}{"type": "ws", "path": path}
-		if c.Host != "" { tr["headers"] = map[string]interface{}{"Host": c.Host} }
+		if c.Host != "" {
+			tr["headers"] = map[string]interface{}{"Host": c.Host}
+		}
 		base["transport"] = tr
 	} else if nt == "grpc" {
 		sn := c.ServiceName
-		if sn == "" { sn = c.Path }
+		if sn == "" {
+			sn = c.Path
+		}
 		base["transport"] = map[string]interface{}{"type": "grpc", "service_name": sn}
 	} else if nt == "httpupgrade" || nt == "xhttp" {
 		path := c.Path
-		if path == "" { path = "/" }
+		if path == "" {
+			path = "/"
+		}
 		tr := map[string]interface{}{"type": "httpupgrade", "path": path}
-		if c.Host != "" { tr["host"] = c.Host }
+		if c.Host != "" {
+			tr["host"] = c.Host
+		}
 		base["transport"] = tr
 	} else if nt == "http" || nt == "h2" {
 		path := c.Path
-		if path == "" { path = "/" }
+		if path == "" {
+			path = "/"
+		}
 		tr := map[string]interface{}{"type": "http", "path": path}
 		if c.Host != "" {
 			hosts :=[]string{}
 			for _, h := range strings.Split(c.Host, ",") {
-				if strings.TrimSpace(h) != "" { hosts = append(hosts, strings.TrimSpace(h)) }
+				if strings.TrimSpace(h) != "" {
+					hosts = append(hosts, strings.TrimSpace(h))
+				}
 			}
-			if len(hosts) > 0 { tr["host"] = hosts }
+			if len(hosts) > 0 {
+				tr["host"] = hosts
+			}
 		}
 		base["transport"] = tr
 	} else if nt == "quic" {
@@ -516,8 +538,12 @@ func buildOutbound(n ProxyNode, tag string) map[string]interface{} {
 		}
 
 		sni := c.SNI
-		if sni == "" && sec != "reality" { sni = c.Host }
-		if sni == "" && sec != "reality" { sni = c.Server }
+		if sni == "" && sec != "reality" {
+			sni = c.Host
+		}
+		if sni == "" && sec != "reality" {
+			sni = c.Server
+		}
 		if sni != "" {
 			tlsConf["server_name"] = strings.Trim(sni, "[]")
 		}
@@ -525,15 +551,21 @@ func buildOutbound(n ProxyNode, tag string) map[string]interface{} {
 		if c.ALPN != "" {
 			var alpns[]string
 			for _, a := range strings.Split(c.ALPN, ",") {
-				if strings.TrimSpace(a) != "" { alpns = append(alpns, strings.TrimSpace(a)) }
+				if strings.TrimSpace(a) != "" {
+					alpns = append(alpns, strings.TrimSpace(a))
+				}
 			}
-			if len(alpns) > 0 { tlsConf["alpn"] = alpns }
+			if len(alpns) > 0 {
+				tlsConf["alpn"] = alpns
+			}
 		} else if sec == "reality" || sec == "tls" {
 			tlsConf["alpn"] =[]string{"h2", "http/1.1"}
 		}
 
 		if sec == "reality" {
-			if len(c.PBK) < 40 || len(c.PBK) > 46 { return nil }
+			if len(c.PBK) < 40 || len(c.PBK) > 46 {
+				return nil
+			}
 			tlsConf["reality"] = map[string]interface{}{"enabled": true, "public_key": c.PBK, "short_id": c.SID}
 		}
 
@@ -549,7 +581,7 @@ func getSocksClient(port int, timeout time.Duration) *http.Client {
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialer.Dial(network, addr)
 		},
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 		DisableKeepAlives: true,
 	}
 	return &http.Client{Transport: transport, Timeout: timeout}
@@ -557,11 +589,13 @@ func getSocksClient(port int, timeout time.Duration) *http.Client {
 
 func testHTTPPing(port int, delaySec float64) (int, bool) {
 	if delaySec > 0 {
-		time.Sleep(time.Duration(delaySec * float64(time.Second)))
+		time.Sleep(time.Duration(delaySec*float64(time.Second)))
 	}
 
 	maxLatency := globalSettings.MaxLatency
-	if maxLatency <= 0 { maxLatency = 5000 }
+	if maxLatency <= 0 {
+		maxLatency = 5000
+	}
 
 	urls := globalSettings.ConnectivityUrls
 	if len(urls) == 0 {
@@ -570,7 +604,9 @@ func testHTTPPing(port int, delaySec float64) (int, bool) {
 	
 	rand.Shuffle(len(urls), func(i, j int) { urls[i], urls[j] = urls[j], urls[i] })
 	testUrls := urls
-	if len(testUrls) > 2 { testUrls = testUrls[:2] }
+	if len(testUrls) > 2 {
+		testUrls = testUrls[:2]
+	}
 
 	client := getSocksClient(port, 5*time.Second)
 	
@@ -580,16 +616,24 @@ func testHTTPPing(port int, delaySec float64) (int, bool) {
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
 		resp, err := client.Do(req)
-		if err != nil { continue }
+		if err != nil {
+			continue
+		}
 		
 		defer resp.Body.Close()
-		if resp.StatusCode != 204 { break }
+		if resp.StatusCode != 204 {
+			break
+		}
 		
 		body, _ := io.ReadAll(resp.Body)
-		if len(body) > 0 { break }
+		if len(body) > 0 {
+			break
+		}
 
 		lat := int(time.Since(t0).Milliseconds())
-		if lat > maxLatency { return 0, false }
+		if lat > maxLatency {
+			return 0, false
+		}
 		return lat, true
 	}
 	return 0, false
@@ -599,12 +643,16 @@ func testHTTPSpeed(port int, strictID string, isChampion bool) (float64, string,
 	timeout := 12 * time.Second
 	targetBytes := normalBytes
 	url := globalSettings.SpeedtestUrl
-	if url == "" { url = "https://speed.cloudflare.com/__down?bytes=5000000" }
+	if url == "" {
+		url = "https://speed.cloudflare.com/__down?bytes=5000000"
+	}
 
 	if isChampion {
 		timeout = 18 * time.Second
 		targetBytes = championBytes
-		if globalSettings.ChampionTestUrl != "" { url = globalSettings.ChampionTestUrl }
+		if globalSettings.ChampionTestUrl != "" {
+			url = globalSettings.ChampionTestUrl
+		}
 	}
 
 	client := getSocksClient(port, timeout)
@@ -644,12 +692,18 @@ func testHTTPSpeed(port int, strictID string, isChampion bool) (float64, string,
 	}
 
 	dur := time.Since(tStart).Seconds()
-	if dur < 0.1 { dur = 0.1 }
+	if dur < 0.1 {
+		dur = 0.1
+	}
 	speed := (float64(total) * 8.0) / (dur * 1000000.0)
-	if speed > 3000.0 { speed = 3000.0 }
+	if speed > 3000.0 {
+		speed = 3000.0
+	}
 	
 	minSpeed := globalSettings.MinSpeed
-	if minSpeed <= 0 { minSpeed = 1.0 }
+	if minSpeed <= 0 {
+		minSpeed = 1.0
+	}
 	if speed < minSpeed {
 		return 0, "UN", false
 	}
@@ -697,14 +751,21 @@ func testHTTPSpeed(port int, strictID string, isChampion bool) (float64, string,
 		}
 	}
 
-	if country == "" || country == "XX" { country = "UN" }
+	if country == "" || country == "XX" {
+		country = "UN"
+	}
 	return speed, country, true
 }
 
 func runChampionPhase(nodes[]ProxyNode) {
-	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Speed > nodes[j].Speed })
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].Speed > nodes[j].Speed
+	})
+	
 	limit := 5
-	if len(nodes) < 5 { limit = len(nodes) }
+	if len(nodes) < 5 {
+		limit = len(nodes)
+	}
 	
 	for i := 0; i < limit; i++ {
 		res := processSingboxBatch([]ProxyNode{nodes[i]}, true)
