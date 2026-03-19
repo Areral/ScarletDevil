@@ -40,12 +40,12 @@ class Inspector:
         try:
             ext = ".exe" if os.name == "nt" else ""
             if not os.path.exists(f"go_core/angra_core{ext}"):
-                logger.info("⚙ [GOLANG]: Компиляция ANGRA-CORE...")
-                subprocess.run(["go", "get", "golang.org/x/net/proxy"], cwd="go_core", check=True)
-                subprocess.run(["go", "mod", "tidy"], cwd="go_core", check=True)
-                subprocess.run(["go", "build", "-o", f"angra_core{ext}", "main.go"], cwd="go_core", check=True)
+                logger.info("⚙ [GOLANG]: Компиляция ANGRA-CORE (Загрузка зависимостей)...")
+                
+                cmd_init = "go mod init angra_core || true && go get golang.org/x/net/proxy && go mod tidy && go build -o angra_core main.go"
+                subprocess.run(cmd_init, shell=True, cwd="go_core", check=True)
             
-            logger.info("⚡[GOLANG]: Запуск сетевого пайплайна (L4 -> L7 -> GeoIP)...")
+            logger.info("⚡[GOLANG]: Запуск сетевого пайплайна (L4 -> L7 -> Champion)...")
             
             proc = await asyncio.create_subprocess_exec(
                 f"./angra_core{ext}", f"../{input_file}", f"../{output_file}",
@@ -69,7 +69,7 @@ class Inspector:
             valid_nodes =[ProxyNode(**data) for data in valid_nodes_data]
             
         except Exception as e:
-            logger.exception(f"✘ [СБОЙ ИНТЕГРАЦИИ GO]: {e}")
+            logger.exception(f"✘[СБОЙ ИНТЕГРАЦИИ GO]: {e}")
             return[]
         finally:
             if os.path.exists(input_file): os.remove(input_file)
