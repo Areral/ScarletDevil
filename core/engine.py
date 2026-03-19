@@ -15,7 +15,7 @@ class Inspector:
 
     async def process_all(self, nodes: List[ProxyNode]) -> List[ProxyNode]:
         total_initial = len(nodes)
-        logger.info(f"►[ANGRA ORCHESTRATOR]: Передача {total_initial} узлов в Go-Ядро (ANGRA-CORE)...")
+        logger.info(f"► [ANGRA ORCHESTRATOR]: Передача {total_initial} узлов в Go-Ядро (ANGRA-CORE)...")
         
         os.makedirs("data", exist_ok=True)
         input_file = f"data/go_in_{uuid.uuid4().hex[:8]}.json"
@@ -27,8 +27,8 @@ class Inspector:
                 "max_latency": CONFIG.checking.get("max_latency", 5000),
                 "min_speed": CONFIG.checking.get("min_speed", 1.0),
                 "connectivity_urls": CONFIG.checking.get("connectivity_urls",["http://cp.cloudflare.com/generate_204"]),
-                "speedtest_url": CONFIG.checking.get("speedtest_url", "https://speed.cloudflare.com/__down?bytes=5000000"),
-                "champion_test_url": CONFIG.checking.get("champion_test_url", "https://speed.cloudflare.com/__down?bytes=20000000"),
+                "speedtest_url": CONFIG.checking.get("speedtest_url", "https://speed.cloudflare.com"),
+                "champion_test_url": CONFIG.checking.get("champion_test_url", "https://speed.cloudflare.com/__down?bytes=50000000"),
                 "batch_size": getattr(CONFIG, "BATCH_SIZE", 100)
             },
             "nodes": nodes_data
@@ -40,12 +40,13 @@ class Inspector:
         try:
             ext = ".exe" if os.name == "nt" else ""
             if not os.path.exists(f"go_core/angra_core{ext}"):
-                logger.info("⚙ [GOLANG]: Компиляция ANGRA-CORE (Загрузка зависимостей)...")
-                
-                cmd_init = "go mod init angra_core || true && go get golang.org/x/net/proxy && go mod tidy && go build -o angra_core main.go"
-                subprocess.run(cmd_init, shell=True, cwd="go_core", check=True)
+                logger.info("⚙[GOLANG]: Компиляция ANGRA-CORE (Загрузка зависимостей)...")
+                subprocess.run(["go", "mod", "init", "angra_core"], cwd="go_core", check=False)
+                subprocess.run(["go", "get", "golang.org/x/net/proxy"], cwd="go_core", check=True)
+                subprocess.run(["go", "mod", "tidy"], cwd="go_core", check=True)
+                subprocess.run(["go", "build", "-o", f"angra_core{ext}", "main.go"], cwd="go_core", check=True)
             
-            logger.info("⚡[GOLANG]: Запуск сетевого пайплайна (L4 -> L7 -> Champion)...")
+            logger.info("⚡ [GOLANG]: Запуск сетевого пайплайна (L4 -> L7 -> Champion)...")
             
             proc = await asyncio.create_subprocess_exec(
                 f"./angra_core{ext}", f"../{input_file}", f"../{output_file}",
@@ -65,11 +66,13 @@ class Inspector:
                 
             with open(output_file, "r", encoding="utf-8") as f:
                 valid_nodes_data = json.load(f)
+                if not valid_nodes_data:
+                    valid_nodes_data = []
                 
             valid_nodes =[ProxyNode(**data) for data in valid_nodes_data]
             
         except Exception as e:
-            logger.exception(f"✘[СБОЙ ИНТЕГРАЦИИ GO]: {e}")
+            logger.exception(f"✘ [СБОЙ ИНТЕГРАЦИИ GO]: {e}")
             return[]
         finally:
             if os.path.exists(input_file): os.remove(input_file)
@@ -79,7 +82,7 @@ class Inspector:
         total = len(nodes)
         self.l4_dropped += (total_initial - total)
 
-        logger.info(f"✔[ANGRA ORCHESTRATOR]: Инспекция полностью завершена. Итого выжило: {total}")
+        logger.info(f"✔ [ANGRA ORCHESTRATOR]: Инспекция полностью завершена. Итого выжило: {total}")
         return valid_nodes
 
     async def champion_run(self, nodes: List[ProxyNode]) -> float:
