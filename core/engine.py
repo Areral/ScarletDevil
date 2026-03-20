@@ -6,13 +6,14 @@ import subprocess
 import uuid
 import re
 import ipaddress
-import base64
 from loguru import logger
 from typing import List, Optional
 from core.models import ProxyNode
 from core.settings import CONFIG
 
 class BatchEngine:
+    _GEO_CACHE: dict = {}
+
     @staticmethod
     def _is_valid_uuid(val: str) -> bool:
         try:
@@ -55,11 +56,10 @@ class BatchEngine:
 
             elif node.protocol == "hysteria2":
                 if not c.password: return None
+
                 base.update({
                     "type": "hysteria2", 
-                    "password": c.password,
-                    "up_mbps": 100,
-                    "down_mbps": 100
+                    "password": c.password
                 })
                 if c.obfs and c.obfs_password:
                     base["obfs"] = {"type": c.obfs, "password": c.obfs_password}
@@ -129,6 +129,47 @@ class Inspector:
     def __init__(self):
         self.l4_dropped = 0
 
+    async def _resolve_geo(self, nodes: List[ProxyNode]):
+        logger.info("► [GEOIP]: Присвоение флагов стран выжившим узлам...")
+        
+        async def fetch_geo(ip: str, session: aiohttp.ClientSession) -> str:
+            if ip in BatchEngine._GEO_CACHE:
+                return BatchEngine._GEO_CACHE[ip]
+                
+            geo_services =[
+                f"http://ip-api.com/json/{ip}",
+                f"https://freeipapi.com/api/json/{ip}"
+            ]
+            
+            for url in geo_services:
+                try:
+                    async with session.get(url, timeout=3.0) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            country = data.get("countryCode", data.get("countryCode", "UN"))
+                            if len(country) == 2:
+                                BatchEngine._GEO_CACHE[ip] = country.upper()
+                                return country.upper()
+                except Exception:
+                    pass
+            return "UN"
+
+        import socket
+        async with aiohttp.ClientSession() as session:
+            for node in nodes:
+                try:
+                    host = node.config.server.strip("[]")
+                    try:
+                        ipaddress.ip_address(host)
+                        ip = host
+                    except ValueError:
+                        ip = socket.gethostbyname(host)
+                        
+                    node.country = await fetch_geo(ip, session)
+                    await asyncio.sleep(0.05)
+                except Exception:
+                    node.country = "UN"
+
     async def process_all(self, nodes: List[ProxyNode]) -> List[ProxyNode]:
         total_initial = len(nodes)
         logger.info(f"► [ANGRA ORCHESTRATOR]: Передача {total_initial} узлов в Go-Ядро (ANGRA-CORE)...")
@@ -165,13 +206,13 @@ class Inspector:
         try:
             ext = ".exe" if os.name == "nt" else ""
             if not os.path.exists(f"go_core/angra_core{ext}"):
-                logger.info("⚙[GOLANG]: Компиляция ANGRA-CORE...")
+                logger.info("⚙ [GOLANG]: Компиляция ANGRA-CORE...")
                 subprocess.run(["go", "mod", "init", "angra_core"], cwd="go_core", check=False)
                 subprocess.run(["go", "get", "golang.org/x/net/proxy"], cwd="go_core", check=True)
                 subprocess.run(["go", "mod", "tidy"], cwd="go_core", check=True)
                 subprocess.run(["go", "build", "-o", f"angra_core{ext}", "main.go"], cwd="go_core", check=True)
             
-            logger.info("⚡[GOLANG]: Запуск сетевого пайплайна (L4 -> L7 -> Champion)...")
+            logger.info("⚡ [GOLANG]: Запуск сетевого пайплайна (L4 -> L7 -> Champion)...")
             
             proc = await asyncio.create_subprocess_exec(
                 f"./angra_core{ext}", f"../{input_file}", f"../{output_file}",
@@ -188,11 +229,15 @@ class Inspector:
             if proc.returncode != 0:
                 logger.error(f"✘ [GOLANG CRASH]: {stderr.decode()}")
                 return[]
-                
-            with open(output_file, "r", encoding="utf-8") as f:
-                valid_nodes_data = json.load(f)
-                if not valid_nodes_data:
-                    valid_nodes_data = []
+            
+            valid_nodes_data =[]
+            if os.path.exists(output_file):
+                with open(output_file, "r", encoding="utf-8") as f:
+                    try:
+                        loaded = json.load(f)
+                        if loaded: valid_nodes_data = loaded
+                    except json.JSONDecodeError:
+                        pass
                 
             valid_nodes =[]
             for data in valid_nodes_data:
@@ -200,7 +245,7 @@ class Inspector:
                 valid_nodes.append(ProxyNode(**data))
             
         except Exception as e:
-            logger.exception(f"✘[СБОЙ ИНТЕГРАЦИИ GO]: {e}")
+            logger.exception(f"✘ [СБОЙ ИНТЕГРАЦИИ GO]: {e}")
             return[]
         finally:
             if os.path.exists(input_file): os.remove(input_file)
@@ -209,6 +254,9 @@ class Inspector:
         nodes = valid_nodes
         total = len(nodes)
         self.l4_dropped += (len(payload_nodes) - total)
+
+        if nodes:
+            await self._resolve_geo(nodes)
 
         logger.info(f"✔ [ANGRA ORCHESTRATOR]: Инспекция полностью завершена. Итого выжило: {total}")
         return valid_nodes
