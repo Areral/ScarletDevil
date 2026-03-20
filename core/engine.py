@@ -6,6 +6,8 @@ import subprocess
 import uuid
 import re
 import ipaddress
+import aiohttp
+import socket
 from loguru import logger
 from typing import List, Optional
 from core.models import ProxyNode
@@ -56,7 +58,6 @@ class BatchEngine:
 
             elif node.protocol == "hysteria2":
                 if not c.password: return None
-
                 base.update({
                     "type": "hysteria2", 
                     "password": c.password
@@ -154,7 +155,6 @@ class Inspector:
                     pass
             return "UN"
 
-        import socket
         async with aiohttp.ClientSession() as session:
             for node in nodes:
                 try:
@@ -229,15 +229,11 @@ class Inspector:
             if proc.returncode != 0:
                 logger.error(f"✘ [GOLANG CRASH]: {stderr.decode()}")
                 return[]
-            
-            valid_nodes_data =[]
-            if os.path.exists(output_file):
-                with open(output_file, "r", encoding="utf-8") as f:
-                    try:
-                        loaded = json.load(f)
-                        if loaded: valid_nodes_data = loaded
-                    except json.JSONDecodeError:
-                        pass
+                
+            with open(output_file, "r", encoding="utf-8") as f:
+                valid_nodes_data = json.load(f)
+                if not valid_nodes_data:
+                    valid_nodes_data = []
                 
             valid_nodes =[]
             for data in valid_nodes_data:
@@ -245,7 +241,7 @@ class Inspector:
                 valid_nodes.append(ProxyNode(**data))
             
         except Exception as e:
-            logger.exception(f"✘ [СБОЙ ИНТЕГРАЦИИ GO]: {e}")
+            logger.exception(f"✘[СБОЙ ИНТЕГРАЦИИ GO]: {e}")
             return[]
         finally:
             if os.path.exists(input_file): os.remove(input_file)
