@@ -17,8 +17,8 @@ from core.settings import CONFIG
 from core.validator import RKNValidator
 
 SS_VALID_METHODS = {
-    "aes-128-gcm", "aes-192-gcm", "aes-256-gcm", 
-    "chacha20-ietf-poly1305", "xchacha20-ietf-poly1305", 
+    "aes-128-gcm", "aes-192-gcm", "aes-256-gcm",
+    "chacha20-ietf-poly1305", "xchacha20-ietf-poly1305",
     "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305"
 }
 
@@ -29,14 +29,15 @@ CONTROLLED_KEYS_COMMON = {
 }
 
 VALID_FINGERPRINTS = {
-    "chrome", "firefox", "safari", "ios", "android", 
+    "chrome", "firefox", "safari", "ios", "android",
     "edge", "360", "qq", "random", "randomized"
 }
 
 _SUBSCRIPTION_PROTOCOLS = ("vless://", "vmess://", "trojan://", "ss://", "hysteria://", "hysteria2://", "hy2://")
 
+
 class LinkParser:
-    GARBAGE_WORDS =[
+    GARBAGE_WORDS = [
         "01010101", "9292929", "11111111-1111", "test1",
         "@pwn1337-telegram", "rootface",
     ]
@@ -62,7 +63,8 @@ class LinkParser:
             s = s.strip().replace('-', '+').replace('_', '/')
             s = re.sub(r'\s+', '', s)
             missing = len(s) % 4
-            if missing: s += "=" * (4 - missing)
+            if missing:
+                s += "=" * (4 - missing)
             return base64.b64decode(s.encode('ascii', 'ignore')).decode('utf-8', 'ignore')
         except Exception:
             return s
@@ -71,7 +73,7 @@ class LinkParser:
     def decode_sub_base64(s: str) -> str:
         if not s or not s.strip():
             return s
-            
+
         s = s.strip()
         if LinkParser._content_has_protocol_lines(s):
             return s
@@ -94,12 +96,12 @@ class LinkParser:
 
     @staticmethod
     def is_valid_host(host: str) -> bool:
-        if not host: 
+        if not host:
             return False
         h = host.strip("[]").lower()
-        if h in ("localhost", "127.0.0.1", "0.0.0.0", "::1"): 
+        if h in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
             return False
-        if h.endswith(".localhost") or h.endswith(".local"): 
+        if h.endswith(".localhost") or h.endswith(".local"):
             return False
         try:
             ip = ipaddress.ip_address(h)
@@ -154,10 +156,10 @@ class LinkParser:
             actual_sni = actual_sni.strip("[] \t")
             try:
                 ipaddress.ip_address(actual_sni)
-                actual_sni = None 
+                actual_sni = None
             except ValueError:
                 pass
-                
+
         conf.sni = actual_sni
 
         if conf.security == "tls":
@@ -183,13 +185,14 @@ class LinkParser:
                 conf.sid = ""
             else:
                 conf.sid = conf.sid.lower().strip()
-            
+
             clean_pbk = conf.pbk.strip() if conf.pbk else ""
             if len(clean_pbk) < 40 or len(clean_pbk) > 46:
                 return None
             try:
                 decoded = base64.urlsafe_b64decode(clean_pbk + '=' * (-len(clean_pbk) % 4))
-                if len(decoded) != 32: return None
+                if len(decoded) != 32:
+                    return None
             except Exception:
                 return None
 
@@ -201,7 +204,8 @@ class LinkParser:
 
     @staticmethod
     def parse_vless(line: str) -> Optional[ProxyNode]:
-        if LinkParser._is_garbage(line): return None
+        if LinkParser._is_garbage(line):
+            return None
         try:
             line = html.unescape(line).replace("/?", "?")
             u = urllib.parse.urlparse(line)
@@ -209,10 +213,13 @@ class LinkParser:
             q_simple = {k: v[0] for k, v in q.items() if v}
 
             host = u.hostname
-            if not host or not LinkParser.is_valid_host(host): return None
-            if not u.port: return None
+            if not host or not LinkParser.is_valid_host(host):
+                return None
+            if not u.port:
+                return None
             uid = urllib.parse.unquote(u.username or "").strip()
-            if not uid: return None
+            if not uid:
+                return None
 
             conf = ProxyConfig(
                 server=host,
@@ -220,7 +227,7 @@ class LinkParser:
                 uuid=uid,
                 type=q_simple.get('type', 'tcp'),
                 security=q_simple.get('security', 'none'),
-                path=q_simple.get('path') or None,
+                path=urllib.parse.unquote(q_simple.get('path', '')) or None,
                 host=q_simple.get('host') or None,
                 sni=(q_simple.get('sni') or q_simple.get('peer')) or None,
                 fp=q_simple.get('fp') or None,
@@ -232,32 +239,37 @@ class LinkParser:
                 service_name=(q_simple.get('serviceName') or q_simple.get('servicename')) or None,
                 raw_meta=LinkParser._extract_clean_meta(q_simple),
             )
-            
+
             conf = LinkParser._normalize_config(conf, "vless")
-            if not conf: return None
-            
+            if not conf:
+                return None
+
             return ProxyNode(protocol="vless", config=conf, raw_uri=line)
         except Exception:
             return None
 
     @staticmethod
     def parse_vmess(line: str) -> Optional[ProxyNode]:
-        if LinkParser._is_garbage(line): return None
+        if LinkParser._is_garbage(line):
+            return None
         try:
             raw_json = LinkParser.decode_base64(line.replace("vmess://", "").strip())
             data = json.loads(raw_json)
 
             host = str(data.get('add', '')).strip()
-            if not host or not LinkParser.is_valid_host(host): return None
-            if not data.get('port'): return None
+            if not host or not LinkParser.is_valid_host(host):
+                return None
+            if not data.get('port'):
+                return None
             uid = str(data.get('id', '')).strip()
-            if not uid: return None
+            if not uid:
+                return None
 
             VMESS_CONTROLLED = {
                 "v", "ps", "add", "port", "id", "net", "tls",
                 "path", "host", "sni", "fp", "alpn", "aid", "type"
             }
-            
+
             aid = data.get('aid', 0)
             alter_id = int(aid) if str(aid).isdigit() else 0
 
@@ -276,28 +288,33 @@ class LinkParser:
                 alter_id=alter_id,
                 raw_meta={k: v for k, v in data.items() if k.lower() not in VMESS_CONTROLLED},
             )
-            
+
             conf = LinkParser._normalize_config(conf, "vmess")
-            if not conf: return None
-            
+            if not conf:
+                return None
+
             return ProxyNode(protocol="vmess", config=conf, raw_uri=line)
         except Exception:
             return None
 
     @staticmethod
     def parse_trojan(line: str) -> Optional[ProxyNode]:
-        if LinkParser._is_garbage(line): return None
+        if LinkParser._is_garbage(line):
+            return None
         try:
             line = html.unescape(line).replace("/?", "?")
             u = urllib.parse.urlparse(line)
-            q = urllib.parse.parseqs(u.query, keep_blank_values=True)
+            q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
             q_simple = {k: v[0] for k, v in q.items() if v}
 
             host = u.hostname
-            if not host or not LinkParser.is_valid_host(host): return None
-            if not u.port: return None
+            if not host or not LinkParser.is_valid_host(host):
+                return None
+            if not u.port:
+                return None
             password = urllib.parse.unquote(u.username or "").strip()
-            if not password: return None
+            if not password:
+                return None
 
             conf = ProxyConfig(
                 server=host,
@@ -305,7 +322,7 @@ class LinkParser:
                 password=password,
                 security=q_simple.get('security', 'tls'),
                 type=q_simple.get('type', 'tcp'),
-                path=q_simple.get('path') or None,
+                path=urllib.parse.unquote(q_simple.get('path', '')) or None,
                 host=q_simple.get('host') or None,
                 sni=(q_simple.get('sni') or q_simple.get('peer')) or None,
                 fp=q_simple.get('fp') or None,
@@ -314,24 +331,27 @@ class LinkParser:
                 service_name=(q_simple.get('serviceName') or q_simple.get('servicename')) or None,
                 raw_meta=LinkParser._extract_clean_meta(q_simple),
             )
-            
+
             conf = LinkParser._normalize_config(conf, "trojan")
-            if not conf: return None
-            
+            if not conf:
+                return None
+
             return ProxyNode(protocol="trojan", config=conf, raw_uri=line)
         except Exception:
             return None
 
     @staticmethod
     def parse_ss(line: str) -> Optional[ProxyNode]:
-        if LinkParser._is_garbage(line): return None
+        if LinkParser._is_garbage(line):
+            return None
         try:
             original_line = line
             line = html.unescape(line).strip()
-            
-            if not line.startswith("ss://"): return None
+
+            if not line.startswith("ss://"):
+                return None
             rest = line[5:]
-            
+
             if '#' in rest:
                 rest, _ = rest.split('#', 1)
 
@@ -351,7 +371,7 @@ class LinkParser:
                         method, password = decoded_creds.split(':', 1)
                 except Exception:
                     pass
-                
+
                 if not method or not password:
                     if ':' in cred_part:
                         method, password = cred_part.split(':', 1)
@@ -360,35 +380,42 @@ class LinkParser:
             else:
                 try:
                     decoded = LinkParser.decode_base64(rest)
-                    if '@' not in decoded: return None
+                    if '@' not in decoded:
+                        return None
                     cred_part, hostport = decoded.rsplit('@', 1)
-                    if ':' not in cred_part: return None
+                    if ':' not in cred_part:
+                        return None
                     method, password = cred_part.split(':', 1)
                 except Exception:
                     return None
 
-            if not hostport: return None
+            if not hostport:
+                return None
 
             if hostport.startswith('['):
                 bracket_end = hostport.find(']')
-                if bracket_end == -1: return None
+                if bracket_end == -1:
+                    return None
                 host = hostport[1:bracket_end]
-                port_str = hostport[bracket_end+2:]
+                port_str = hostport[bracket_end + 2:]
             else:
-                if ':' not in hostport: return None
+                if ':' not in hostport:
+                    return None
                 host, port_str = hostport.rsplit(':', 1)
 
-            try: 
+            try:
                 port = int(port_str)
-            except ValueError: 
+            except ValueError:
                 return None
 
             method = method.strip().lower()
             password = urllib.parse.unquote(password.strip())
             clean_host = urllib.parse.unquote(host.strip().strip('[]'))
 
-            if not LinkParser.is_valid_host(clean_host): return None
-            if method not in SS_VALID_METHODS: return None 
+            if not LinkParser.is_valid_host(clean_host):
+                return None
+            if method not in SS_VALID_METHODS:
+                return None
 
             q_simple = {}
             if query:
@@ -403,34 +430,40 @@ class LinkParser:
                 type="tcp",
                 raw_meta=LinkParser._extract_clean_meta(q_simple)
             )
-            
+
             conf = LinkParser._normalize_config(conf, "ss")
-            if not conf: return None
-            
+            if not conf:
+                return None
+
             return ProxyNode(protocol="ss", config=conf, raw_uri=original_line)
         except Exception:
             return None
 
     @staticmethod
     def parse_hy2(line: str) -> Optional[ProxyNode]:
-        if LinkParser._is_garbage(line): return None
+        if LinkParser._is_garbage(line):
+            return None
         try:
             original_line = line
             line = html.unescape(line).strip()
-            if line.startswith("hy2://"): line = "hysteria2://" + line[6:]
+            if line.startswith("hy2://"):
+                line = "hysteria2://" + line[6:]
 
             u = urllib.parse.urlparse(line)
             q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
             q_simple = {k: v[0] for k, v in q.items() if v}
 
             host = u.hostname
-            if not host or not LinkParser.is_valid_host(host): return None
-            if not u.port: return None
+            if not host or not LinkParser.is_valid_host(host):
+                return None
+            if not u.port:
+                return None
             password = urllib.parse.unquote(u.username or "").strip()
-            if not password: return None
+            if not password:
+                return None
 
-            HY2_CONTROLLED = {"sni", "peer", "obfs", "obfs-password"}
-            
+            HY2_CONTROLLED = {"sni", "peer", "obfs", "obfs-password", "insecure"}
+
             conf = ProxyConfig(
                 server=host,
                 port=u.port,
@@ -440,10 +473,14 @@ class LinkParser:
                 obfs_password=q_simple.get('obfs-password') or None,
                 raw_meta={k: v for k, v in q_simple.items() if k.lower() not in HY2_CONTROLLED},
             )
-            
+
+            insecure_raw = q_simple.get('insecure', '1')
+            conf.raw_meta['insecure'] = insecure_raw
+
             conf = LinkParser._normalize_config(conf, "hysteria2")
-            if not conf: return None
-            
+            if not conf:
+                return None
+
             return ProxyNode(protocol="hysteria2", config=conf, raw_uri=original_line)
         except Exception:
             return None
@@ -471,8 +508,8 @@ class LinkParser:
     async def fetch_and_parse(self) -> List[ProxyNode]:
         max_accounts_per_server = CONFIG.parser.get("max_accounts_per_server", 5)
         raw_sources = CONFIG.SUBSCRIPTION_SOURCES
-        if not raw_sources: 
-            return[]
+        if not raw_sources:
+            return []
 
         if isinstance(raw_sources, list):
             sources = list(dict.fromkeys(s.strip() for s in raw_sources if s.strip()))
@@ -492,16 +529,17 @@ class LinkParser:
             "hysteria2://": self.parse_hy2,
         }
 
-        nodes: List[ProxyNode] =[]
+        nodes: List[ProxyNode] = []
         seen_ids: set = set()
         machine_counts: dict = {}
-        
+
         for i, content in enumerate(results):
-            if not content: continue
+            if not content:
+                continue
             url = sources[i]
 
             content_hash = hashlib.md5(content.encode('utf-8', errors='ignore')).hexdigest()
-            if content_hash in self._seen_content_hashes: 
+            if content_hash in self._seen_content_hashes:
                 continue
             self._seen_content_hashes.add(content_hash)
 
@@ -510,14 +548,15 @@ class LinkParser:
 
             for raw_line in lines:
                 line = raw_line.strip()
-                if not line or line.startswith('#'): continue
+                if not line or line.startswith('#'):
+                    continue
 
                 node = None
                 for prefix, parser_fn in parsers.items():
                     if line.startswith(prefix):
                         node = parser_fn(line)
                         break
-                
+
                 if node:
                     if node.protocol in ("vless", "vmess", "trojan"):
                         if node.config.security in ("none", "") and node.config.type not in ("ws", "httpupgrade", "xhttp"):
@@ -525,11 +564,11 @@ class LinkParser:
 
                     if node.strict_id not in seen_ids:
                         m_id = node.machine_id
-                        
+
                         if machine_counts.get(m_id, 0) < max_accounts_per_server:
                             node.source_url = url
                             node.is_bs = RKNValidator.check_bs(node)
-                            
+
                             nodes.append(node)
                             seen_ids.add(node.strict_id)
                             machine_counts[m_id] = machine_counts.get(m_id, 0) + 1
