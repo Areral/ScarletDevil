@@ -23,18 +23,18 @@ import (
 type EngineSettings struct {
 	MaxLatency       int      `json:"max_latency"`
 	MinSpeed         float64  `json:"min_speed"`
-	ConnectivityUrls[]string `json:"connectivity_urls"`
+	ConnectivityUrls []string `json:"connectivity_urls"`
 	SpeedtestUrl     string   `json:"speedtest_url"`
 	ChampionTestUrl  string   `json:"champion_test_url"`
 	BatchSize        int      `json:"batch_size"`
 }
 
 type ProxyConfig struct {
-	Server       string                 `json:"server"`
-	Port         int                    `json:"port"`
-	Type         string                 `json:"type"`
-	Security     string                 `json:"security,omitempty"`
-	RawMeta      map[string]interface{} `json:"raw_meta,omitempty"`
+	Server  string                 `json:"server"`
+	Port    int                    `json:"port"`
+	Type    string                 `json:"type"`
+	Security string                `json:"security,omitempty"`
+	RawMeta map[string]interface{} `json:"raw_meta,omitempty"`
 }
 
 type ProxyNode struct {
@@ -51,14 +51,14 @@ type ProxyNode struct {
 
 type InputPayload struct {
 	Settings EngineSettings           `json:"settings"`
-	Nodes   []map[string]interface{} `json:"nodes"`
+	Nodes    []map[string]interface{} `json:"nodes"`
 }
 
 var (
 	globalSettings    EngineSettings
-	forbiddenNetworks[]*net.IPNet
+	forbiddenNetworks []*net.IPNet
 	championBytes     = 10 * 1024 * 1024
-	normalBytes       = 3 * 1024 * 1024
+	normalBytes       = 1 * 1024 * 1024
 	chunkSize         = 65536
 	portCounter       = 10000
 	portMutex         sync.Mutex
@@ -66,7 +66,7 @@ var (
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
-	cidrs :=[]string{
+	cidrs := []string{
 		"1.1.1.0/24", "1.0.0.0/24", "8.8.8.0/24", "8.8.4.0/24",
 		"162.159.0.0/16", "104.16.0.0/12", "172.64.0.0/13",
 	}
@@ -131,10 +131,10 @@ func runL4Phase(nodes []map[string]interface{}) []map[string]interface{} {
 	var mu sync.Mutex
 
 	sem := make(chan struct{}, 75)
-	chunkSize := 500
+	scanChunkSize := 500
 
-	for i := 0; i < len(nodes); i += chunkSize {
-		end := i + chunkSize
+	for i := 0; i < len(nodes); i += scanChunkSize {
+		end := i + scanChunkSize
 		if end > len(nodes) {
 			end = len(nodes)
 		}
@@ -229,7 +229,7 @@ func checkL4(node map[string]interface{}) bool {
 	return true
 }
 
-func runL7Phase(nodes []map[string]interface{})[]map[string]interface{} {
+func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 	batchSize := globalSettings.BatchSize
 	if batchSize <= 0 {
 		batchSize = 100
@@ -244,7 +244,7 @@ func runL7Phase(nodes []map[string]interface{})[]map[string]interface{} {
 		}
 		batch := nodes[i:end]
 		batchNum := (i / batchSize) + 1
-		
+
 		survivors := processSingboxRecursive(batch, false, 0)
 		if len(survivors) > 0 {
 			finalNodes = append(finalNodes, survivors...)
@@ -262,17 +262,15 @@ func processSingboxRecursive(batch []map[string]interface{}, isChampion bool, de
 		return []map[string]interface{}{}
 	}
 	if depth > 3 {
-		
 		return []map[string]interface{}{}
 	}
 
 	survivors, crashed := processSingboxBatch(batch, isChampion)
 	if crashed {
 		if len(batch) == 1 {
-			
 			return []map[string]interface{}{}
 		}
-		
+
 		mid := len(batch) / 2
 		left := processSingboxRecursive(batch[:mid], isChampion, depth+1)
 		right := processSingboxRecursive(batch[mid:], isChampion, depth+1)
@@ -282,13 +280,13 @@ func processSingboxRecursive(batch []map[string]interface{}, isChampion bool, de
 	return survivors
 }
 
-func processSingboxBatch(batch[]map[string]interface{}, isChampion bool) ([]map[string]interface{}, bool) {
+func processSingboxBatch(batch []map[string]interface{}, isChampion bool) ([]map[string]interface{}, bool) {
 	basePort := getNextBasePort(len(batch))
 	inbounds := make([]map[string]interface{}, 0)
 	outbounds := make([]map[string]interface{}, 0)
-	rules :=[]map[string]interface{}{
+	rules := []map[string]interface{}{
 		{"protocol": "dns", "outbound": "direct"},
-		{"ip_cidr":[]string{"127.0.0.0/8", "10.0.0.0/8", "192.168.0.0/16", "172.16.0.0/12", "::1/128", "fc00::/7", "fe80::/10"}, "outbound": "block"},
+		{"ip_cidr": []string{"127.0.0.0/8", "10.0.0.0/8", "192.168.0.0/16", "172.16.0.0/12", "::1/128", "fc00::/7", "fe80::/10"}, "outbound": "block"},
 	}
 
 	validMap := make(map[int]map[string]interface{})
@@ -309,9 +307,13 @@ func processSingboxBatch(batch[]map[string]interface{}, isChampion bool) ([]map[
 		})
 		outbounds = append(outbounds, readyOutbound)
 		rules = append(rules, map[string]interface{}{
-			"inbound":[]string{fmt.Sprintf("in-%d", i)}, "outbound": tag,
+			"inbound": []string{fmt.Sprintf("in-%d", i)}, "outbound": tag,
 		})
 		validMap[localPort] = node
+	}
+
+	if len(validMap) == 0 {
+		return []map[string]interface{}{}, false
 	}
 
 	outbounds = append(outbounds, map[string]interface{}{"type": "direct", "tag": "direct"})
@@ -346,7 +348,7 @@ func processSingboxBatch(batch[]map[string]interface{}, isChampion bool) ([]map[
 		cmd.Process.Kill()
 		cmd.Wait()
 	}()
-	
+
 	portReady := false
 	for start := time.Now(); time.Since(start) < 5*time.Second; {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", basePort), 300*time.Millisecond)
@@ -355,19 +357,14 @@ func processSingboxBatch(batch[]map[string]interface{}, isChampion bool) ([]map[
 			portReady = true
 			break
 		}
-		
-		if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
-			return nil, true
-		}
-
 		time.Sleep(100 * time.Millisecond)
 	}
 
 	if !portReady {
 		return nil, true
 	}
-	time.Sleep(1 * time.Second)
-	
+	time.Sleep(500 * time.Millisecond)
+
 	var wgPing sync.WaitGroup
 	var mu sync.Mutex
 	pingPassed := make(map[int]map[string]interface{})
@@ -376,11 +373,11 @@ func processSingboxBatch(batch[]map[string]interface{}, isChampion bool) ([]map[
 	for port, node := range validMap {
 		wgPing.Add(1)
 		semPing <- struct{}{}
-		
+
 		go func(p int, n map[string]interface{}) {
 			defer wgPing.Done()
 			defer func() { <-semPing }()
-			
+
 			if lat, ok := testHTTPPing(p); ok {
 				n["latency"] = lat
 				mu.Lock()
@@ -394,7 +391,7 @@ func processSingboxBatch(batch[]map[string]interface{}, isChampion bool) ([]map[
 	if len(pingPassed) == 0 {
 		return nil, false
 	}
-	
+
 	var wgSpeed sync.WaitGroup
 	alive := make([]map[string]interface{}, 0)
 	semSpeed := make(chan struct{}, 10)
@@ -402,11 +399,11 @@ func processSingboxBatch(batch[]map[string]interface{}, isChampion bool) ([]map[
 	for port, node := range pingPassed {
 		wgSpeed.Add(1)
 		semSpeed <- struct{}{}
-		
+
 		go func(p int, n map[string]interface{}) {
 			defer wgSpeed.Done()
 			defer func() { <-semSpeed }()
-			
+
 			verifySSL := resolvePayloadSSL(n)
 			if speed, ok := testHTTPSpeed(p, verifySSL, isChampion); ok {
 				n["speed"] = speed
@@ -422,7 +419,10 @@ func processSingboxBatch(batch[]map[string]interface{}, isChampion bool) ([]map[
 }
 
 func getSocksClient(port int, timeout time.Duration, verifySSL bool) *http.Client {
-	dialer, _ := proxy.SOCKS5("tcp", fmt.Sprintf("127.0.0.1:%d", port), nil, proxy.Direct)
+	dialer, err := proxy.SOCKS5("tcp", fmt.Sprintf("127.0.0.1:%d", port), nil, proxy.Direct)
+	if err != nil {
+		dialer = proxy.Direct
+	}
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialer.Dial(network, addr)
@@ -441,35 +441,48 @@ func testHTTPPing(port int) (int, bool) {
 
 	urls := globalSettings.ConnectivityUrls
 	if len(urls) == 0 {
-		urls =[]string{"http://www.gstatic.com/generate_204"}
-	}
-	
-	rand.Shuffle(len(urls), func(i, j int) { urls[i], urls[j] = urls[j], urls[i] })
-	testUrls := urls
-	if len(testUrls) > 2 {
-		testUrls = testUrls[:2]
+		urls = []string{
+			"http://cp.cloudflare.com/generate_204",
+			"http://www.gstatic.com/generate_204",
+		}
 	}
 
-	client := getSocksClient(port, 5*time.Second, false)
-	
-	t0 := time.Now()
-	for _, targetUrl := range testUrls {
-		req, _ := http.NewRequest("GET", targetUrl, nil)
+	var filtered []string
+	for _, u := range urls {
+		if strings.Contains(strings.ToLower(u), "generate_204") {
+			filtered = append(filtered, u)
+		}
+	}
+	if len(filtered) > 0 {
+		urls = filtered
+	}
+
+	rand.Shuffle(len(urls), func(i, j int) { urls[i], urls[j] = urls[j], urls[i] })
+	if len(urls) > 2 {
+		urls = urls[:2]
+	}
+
+	client := getSocksClient(port, time.Duration(maxLatency+1500)*time.Millisecond, false)
+
+	for _, targetUrl := range urls {
+		t0 := time.Now()
+
+		req, err := http.NewRequest("GET", targetUrl, nil)
+		if err != nil {
+			continue
+		}
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
 		resp, err := client.Do(req)
 		if err != nil {
 			continue
 		}
-		
-		defer resp.Body.Close()
+
+		io.Copy(io.Discard, io.LimitReader(resp.Body, 512))
+		resp.Body.Close()
+
 		if resp.StatusCode != 204 {
-			break
-		}
-		
-		body, _ := io.ReadAll(resp.Body)
-		if len(body) > 0 {
-			break
+			continue
 		}
 
 		lat := int(time.Since(t0).Milliseconds())
@@ -482,52 +495,48 @@ func testHTTPPing(port int) (int, bool) {
 }
 
 func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
-	timeout := 12 * time.Second
-	targetBytes := normalBytes
-	url := globalSettings.SpeedtestUrl
-	if url == "" {
-		url = "https://speed.cloudflare.com"
+	minSpeed := globalSettings.MinSpeed
+	if minSpeed <= 0 {
+		minSpeed = 1.0
 	}
 
 	if isChampion {
-		timeout = 18 * time.Second
-		targetBytes = championBytes
-		if globalSettings.ChampionTestUrl != "" {
-			url = globalSettings.ChampionTestUrl
+		timeout := 25 * time.Second
+		url := globalSettings.ChampionTestUrl
+		if url == "" {
+			url = "https://speed.cloudflare.com/__down?bytes=10485760"
 		}
-	}
 
-	client := getSocksClient(port, timeout, verifySSL)
-
-	if isChampion {
-		req, _ := http.NewRequest("GET", url, nil)
+		client := getSocksClient(port, timeout, verifySSL)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return 0, false
+		}
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
 
 		tStart := time.Now()
 		resp, err := client.Do(req)
-		
+		if err != nil {
+			return 0, false
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == 429 || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return 0, false
+		}
+
+		buf := make([]byte, chunkSize)
 		total := 0
-		if err == nil {
-			defer resp.Body.Close()
-			if resp.StatusCode == 429 {
-				total = targetBytes
-				tStart = time.Now().Add(-2 * time.Second)
-			} else if resp.StatusCode == 200 {
-				buf := make([]byte, chunkSize)
-				for {
-					n, errRead := resp.Body.Read(buf)
-					total += n
-					
-					dur := time.Since(tStart).Seconds()
-					if dur > 3.5 && total < 65536 {
-						return 0, false
-					}
-					if total >= targetBytes || errRead != nil {
-						break
-					}
-				}
-			} else {
+		for {
+			n, errRead := resp.Body.Read(buf)
+			total += n
+
+			dur := time.Since(tStart).Seconds()
+			if dur > 3.5 && total < 65536 {
 				return 0, false
+			}
+			if total >= championBytes || errRead != nil {
+				break
 			}
 		}
 
@@ -536,36 +545,68 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
 		}
 
 		dur := time.Since(tStart).Seconds()
-		if dur < 0.1 { dur = 0.1 }
+		if dur < 0.1 {
+			dur = 0.1
+		}
 		speed := (float64(total) * 8.0) / (dur * 1000000.0)
-		if speed > 3000.0 { speed = 3000.0 }
-		
-		minSpeed := globalSettings.MinSpeed
-		if minSpeed <= 0 { minSpeed = 1.0 }
-		if speed < minSpeed { return 0, false }
-
+		if speed > 3000.0 {
+			speed = 3000.0
+		}
+		if speed < minSpeed {
+			return 0, false
+		}
 		return speed, true
+
 	} else {
-		
-		req, _ := http.NewRequest("HEAD", url, nil)
+		timeout := 15 * time.Second
+		dlUrl := globalSettings.SpeedtestUrl
+		if dlUrl == "" || dlUrl == "https://speed.cloudflare.com" {
+			dlUrl = "https://speed.cloudflare.com/__down?bytes=1048576"
+		}
+
+		client := getSocksClient(port, timeout, verifySSL)
+		req, err := http.NewRequest("GET", dlUrl, nil)
+		if err != nil {
+			return 0, false
+		}
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
 
 		tStart := time.Now()
 		resp, err := client.Do(req)
-		if err != nil || (resp.StatusCode < 200 || resp.StatusCode >= 500) {
+		if err != nil {
 			return 0, false
 		}
 		defer resp.Body.Close()
 
-		dur := time.Since(tStart).Seconds()
-		if dur < 0.05 { dur = 0.05 }
-		speed := 15.0 / dur
-		
-		minSpeed := globalSettings.MinSpeed
-		if minSpeed <= 0 { minSpeed = 1.0 }
-		if speed < minSpeed { return 0, false }
-		if speed > 3000.0 { speed = 3000.0 }
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return 0, false
+		}
 
+		buf := make([]byte, chunkSize)
+		total := 0
+		for {
+			n, errRead := resp.Body.Read(buf)
+			total += n
+			if total >= normalBytes || errRead != nil {
+				break
+			}
+		}
+
+		if total < 256*1024 {
+			return 0, false
+		}
+
+		dur := time.Since(tStart).Seconds()
+		if dur < 0.05 {
+			dur = 0.05
+		}
+		speed := (float64(total) * 8.0) / (dur * 1000000.0)
+		if speed > 3000.0 {
+			speed = 3000.0
+		}
+		if speed < minSpeed {
+			return 0, false
+		}
 		return speed, true
 	}
 }
@@ -574,10 +615,14 @@ func resolvePayloadSSL(node map[string]interface{}) bool {
 	sec := ""
 	config, ok := node["config"].(map[string]interface{})
 	if ok {
-		if s, ok := config["security"].(string); ok { sec = s }
+		if s, ok := config["security"].(string); ok {
+			sec = s
+		}
 	}
-	if sec == "reality" { return true }
-	
+	if sec == "reality" {
+		return true
+	}
+
 	if ok {
 		if rawMeta, ok := config["raw_meta"].(map[string]interface{}); ok {
 			for k, v := range rawMeta {
@@ -599,13 +644,13 @@ func runChampionPhase(nodes []map[string]interface{}) {
 		sJ, _ := nodes[j]["speed"].(float64)
 		return sI > sJ
 	})
-	
+
 	limit := 5
 	if len(nodes) < 5 {
 		limit = len(nodes)
 	}
-	
-	fmt.Printf("►[ANGRA-GO CHAMPION]: Старт 50MB спидтеста для Топ-%d\n", limit)
+
+	fmt.Printf("►[ANGRA-GO CHAMPION]: Старт спидтеста для Топ-%d\n", limit)
 
 	for i := 0; i < limit; i++ {
 		res, crashed := processSingboxBatch([]map[string]interface{}{nodes[i]}, true)
