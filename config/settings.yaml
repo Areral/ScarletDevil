@@ -13,18 +13,17 @@ system:
   user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
 
 checking:
-  # = Массив URL для тестирования Fake 200 OK =
+  # = Массив URL для тестирования HTTP 204.
   connectivity_urls:
     - "http://cp.cloudflare.com/generate_204"
     - "http://www.gstatic.com/generate_204"
-    - "http://captive.apple.com/hotspot-detect.html"
     - "http://edge-http.microsoft.com/captiveportal/generate_204"
     - "http://connectivitycheck.gstatic.com/generate_204"
     
-  # = Lightweight Head-URL для массового замера синтетической скорости =
+  # = URL для замера реальной скорости (1MB download для массового теста) =
   speedtest_url: "https://speed.cloudflare.com"
-  # = Тестовые файлы для замера скорости Топ-5 Чемпионов (50MB) =
-  champion_test_url: "https://speed.cloudflare.com/__down?bytes=50000000"
+  # = URL для 10MB спидтеста Топ-5 Чемпионов =
+  champion_test_url: "https://speed.cloudflare.com/__down?bytes=10485760"
   
   # = Минимальная скорость в Mbps для пропуска узла в финальный лист =
   min_speed: 1.0
