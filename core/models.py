@@ -2,6 +2,7 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, Any
 
+
 class ProxyConfig(BaseModel):
     server: str
     port: int
@@ -25,6 +26,8 @@ class ProxyConfig(BaseModel):
     obfs_password: Optional[str] = Field(None, alias="obfs-password")
     raw_meta: Dict[str, Any] = Field(default_factory=dict)
 
+    model_config = {"populate_by_name": True}
+
     @field_validator('port', mode='before')
     @classmethod
     def validate_port(cls, v):
@@ -32,6 +35,7 @@ class ProxyConfig(BaseModel):
             return int(v)
         except (ValueError, TypeError):
             return 443
+
 
 class ProxyNode(BaseModel):
     protocol: str
@@ -46,8 +50,8 @@ class ProxyNode(BaseModel):
     @property
     def strict_id(self) -> str:
         ident = self.config.uuid or self.config.password or "anon"
-        mut = self.config.raw_meta.get("mutated", "original")
-        return f"{self.protocol}:{self.config.server}:{self.config.port}:{ident}:{mut}"
+        transport = self.config.type or "tcp"
+        return f"{self.protocol}:{self.config.server}:{self.config.port}:{ident}:{transport}"
 
     @property
     def machine_id(self) -> str:
