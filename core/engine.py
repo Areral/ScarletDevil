@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 import uuid
-import re
 import ipaddress
 import aiohttp
 import socket
@@ -28,7 +27,7 @@ class BatchEngine:
     @staticmethod
     def _node_to_outbound(node: ProxyNode, tag: str) -> Optional[dict]:
         c = node.config
-        base = {"tag": tag, "server": c.server, "server_port": c.port}
+        base: dict = {"tag": tag, "server": c.server, "server_port": c.port}
 
         try:
             if node.protocol == "vless":
@@ -65,19 +64,31 @@ class BatchEngine:
             elif node.protocol == "hysteria2":
                 if not c.password:
                     return None
-                base.update({
-                    "type": "hysteria2",
-                    "password": c.password
-                })
+                base.update({"type": "hysteria2", "password": c.password})
                 if c.obfs and c.obfs_password:
                     base["obfs"] = {"type": c.obfs, "password": c.obfs_password}
+
+                hy2_tls: dict = {"enabled": True, "insecure": True}
+                sni = c.sni or c.host
+                if sni:
+                    hy2_tls["server_name"] = sni.strip("[]")
+                if c.alpn:
+                    hy2_tls["alpn"] = [x.strip() for x in c.alpn.split(",") if x.strip()]
+                base["tls"] = hy2_tls
+                return base
+
+            else:
+                return None
 
             if c.type in ("ws", "websocket"):
                 base["transport"] = {"type": "ws", "path": c.path or "/"}
                 if c.host:
                     base["transport"]["headers"] = {"Host": c.host}
             elif c.type == "grpc":
-                base["transport"] = {"type": "grpc", "service_name": c.service_name or c.path or ""}
+                base["transport"] = {
+                    "type": "grpc",
+                    "service_name": c.service_name or c.path or ""
+                }
             elif c.type in ("httpupgrade", "xhttp"):
                 base["transport"] = {"type": "httpupgrade", "path": c.path or "/"}
                 if c.host:
@@ -90,7 +101,7 @@ class BatchEngine:
                 base["transport"] = {"type": "quic"}
 
             if c.security in ("tls", "reality", "auto"):
-                tls = {"enabled": True}
+                tls: dict = {"enabled": True}
 
                 if c.security == "tls":
                     tls["insecure"] = True
@@ -105,7 +116,8 @@ class BatchEngine:
 
                 if c.fp:
                     clean_fp = c.fp.lower()
-                    if clean_fp in {"chrome", "firefox", "edge", "safari", "360", "qq", "ios", "android", "random", "randomized"}:
+                    if clean_fp in {"chrome", "firefox", "edge", "safari", "360", "qq",
+                                    "ios", "android", "random", "randomized"}:
                         tls["utls"] = {"enabled": True, "fingerprint": clean_fp}
                 elif c.security in ("reality", "tls"):
                     tls["utls"] = {"enabled": True, "fingerprint": "chrome"}
@@ -126,10 +138,7 @@ class BatchEngine:
                     if len(clean_pbk) < 40 or len(clean_pbk) > 46:
                         return None
                     tls["reality"] = {"enabled": True, "public_key": clean_pbk}
-                    if c.sid:
-                        tls["reality"]["short_id"] = c.sid
-                    else:
-                        tls["reality"]["short_id"] = ""
+                    tls["reality"]["short_id"] = c.sid if c.sid else ""
 
                 base["tls"] = tls
 
@@ -145,7 +154,6 @@ class Inspector:
 
     async def _resolve_geo(self, nodes: List[ProxyNode]):
         logger.info("► [GEOIP]: Присвоение флагов стран выжившим узлам...")
-
         if not nodes:
             return
 
@@ -160,7 +168,7 @@ class Inspector:
                     return None
 
         hosts = [n.config.server.strip("[]") for n in nodes]
-        resolved = await asyncio.gather(*[resolve_ip(h) for h in hosts], return_exceptions=False)
+        resolved: List[Optional[str]] = await asyncio.gather(*[resolve_ip(h) for h in hosts])
 
         node_ip_pairs: List[tuple] = []
         ips_to_fetch: List[str] = []
@@ -181,38 +189,45 @@ class Inspector:
         )
 
         GEO_BATCH_SIZE = 100
-        GEO_BATCH_SLEEP = 4.5
+        GEO_BATCH_SLEEP = 4.5 
 
-        async with aiohttp.ClientSession() as session:
-            for i in range(0, len(ips_to_fetch), GEO_BATCH_SIZE):
-                batch_ips = ips_to_fetch[i:i + GEO_BATCH_SIZE]
-                body = [{"query": ip, "fields": "query,status,countryCode"} for ip in batch_ips]
+        if ips_to_fetch:
+            async with aiohttp.ClientSession() as session:
+                for i in range(0, len(ips_to_fetch), GEO_BATCH_SIZE):
+                    batch_ips = ips_to_fetch[i:i + GEO_BATCH_SIZE]
+                    body = [
+                        {"query": ip, "fields": "query,status,countryCode"}
+                        for ip in batch_ips
+                    ]
+                    try:
+                        async with session.post(
+                            "http://ip-api.com/batch",
+                            json=body,
+                            timeout=aiohttp.ClientTimeout(total=15),
+                        ) as resp:
+                            if resp.status == 200:
+                                data = await resp.json(content_type=None)
+                                for item in data:
+                                    ip_key = item.get("query", "")
+                                    if not ip_key:
+                                        continue
+                                    status = item.get("status", "fail")
+                                    raw_cc = item.get("countryCode") if status == "success" else None
+                                    country = (raw_cc or "UN").strip().upper()
+                                    if len(country) != 2:
+                                        country = "UN"
+                                    BatchEngine._GEO_CACHE[ip_key] = country
+                            elif resp.status == 429:
+                                logger.warning(
+                                    "► [GEOIP]: ip-api.com rate limit hit. "
+                                    "Оставшиеся узлы получат UN."
+                                )
+                                break
+                    except Exception as exc:
+                        logger.debug(f"GeoIP batch error: {exc}")
 
-                try:
-                    async with session.post(
-                        "http://ip-api.com/batch",
-                        json=body,
-                        timeout=aiohttp.ClientTimeout(total=15),
-                    ) as resp:
-                        if resp.status == 200:
-                            data = await resp.json(content_type=None)
-                            for item in data:
-                                ip = item.get("query", "")
-                                if not ip:
-                                    continue
-                                status = item.get("status", "fail")
-                                country_raw = item.get("countryCode") if status == "success" else None
-                                country = (country_raw or "UN").upper()
-                                if len(country) != 2:
-                                    country = "UN"
-                                BatchEngine._GEO_CACHE[ip] = country
-                        elif resp.status == 429:
-                            logger.warning("► [GEOIP]: ip-api.com rate limit hit — увеличьте GEO_BATCH_SLEEP")
-                except Exception as e:
-                    logger.debug(f"GeoIP batch request failed: {e}")
-
-                if i + GEO_BATCH_SIZE < len(ips_to_fetch):
-                    await asyncio.sleep(GEO_BATCH_SLEEP)
+                    if i + GEO_BATCH_SIZE < len(ips_to_fetch):
+                        await asyncio.sleep(GEO_BATCH_SLEEP)
 
         for node, ip in node_ip_pairs:
             node.country = BatchEngine._GEO_CACHE.get(ip, "UN")
@@ -222,13 +237,15 @@ class Inspector:
 
     async def process_all(self, nodes: List[ProxyNode]) -> List[ProxyNode]:
         total_initial = len(nodes)
-        logger.info(f"► [ANGRA ORCHESTRATOR]: Передача {total_initial} узлов в Go-Ядро (ANGRA-CORE)...")
+        logger.info(
+            f"► [ANGRA ORCHESTRATOR]: Передача {total_initial} узлов в Go-Ядро (ANGRA-CORE)..."
+        )
 
         os.makedirs("data", exist_ok=True)
         input_file = f"data/go_in_{uuid.uuid4().hex[:8]}.json"
         output_file = f"data/go_out_{uuid.uuid4().hex[:8]}.json"
 
-        payload_nodes = []
+        payload_nodes: List[dict] = []
         for n in nodes:
             outbound = BatchEngine._node_to_outbound(n, "placeholder")
             if outbound:
@@ -242,12 +259,19 @@ class Inspector:
             "settings": {
                 "max_latency": CONFIG.checking.get("max_latency", 5000),
                 "min_speed": CONFIG.checking.get("min_speed", 1.0),
-                "connectivity_urls": CONFIG.checking.get("connectivity_urls", ["http://cp.cloudflare.com/generate_204"]),
-                "speedtest_url": CONFIG.checking.get("speedtest_url", "https://speed.cloudflare.com"),
-                "champion_test_url": CONFIG.checking.get("champion_test_url", "https://speed.cloudflare.com/__down?bytes=10485760"),
-                "batch_size": getattr(CONFIG, "BATCH_SIZE", 100)
+                "connectivity_urls": CONFIG.checking.get(
+                    "connectivity_urls", ["http://cp.cloudflare.com/generate_204"]
+                ),
+                "speedtest_url": CONFIG.checking.get(
+                    "speedtest_url", "https://speed.cloudflare.com"
+                ),
+                "champion_test_url": CONFIG.checking.get(
+                    "champion_test_url",
+                    "https://speed.cloudflare.com/__down?bytes=10485760"
+                ),
+                "batch_size": getattr(CONFIG, "BATCH_SIZE", 150),
             },
-            "nodes": payload_nodes
+            "nodes": payload_nodes,
         }
 
         with open(input_file, "w", encoding="utf-8") as f:
@@ -255,12 +279,22 @@ class Inspector:
 
         try:
             ext = ".exe" if os.name == "nt" else ""
-            if not os.path.exists(f"go_core/angra_core{ext}"):
+            binary = f"go_core/angra_core{ext}"
+            if not os.path.exists(binary):
                 logger.info("⚙ [GOLANG]: Компиляция ANGRA-CORE...")
-                subprocess.run(["go", "mod", "init", "angra_core"], cwd="go_core", check=False)
-                subprocess.run(["go", "get", "golang.org/x/net/proxy"], cwd="go_core", check=True)
+                subprocess.run(
+                    ["go", "mod", "init", "angra_core"],
+                    cwd="go_core", check=False, capture_output=True
+                )
+                subprocess.run(
+                    ["go", "get", "golang.org/x/net/proxy"],
+                    cwd="go_core", check=True
+                )
                 subprocess.run(["go", "mod", "tidy"], cwd="go_core", check=True)
-                subprocess.run(["go", "build", "-o", f"angra_core{ext}", "main.go"], cwd="go_core", check=True)
+                subprocess.run(
+                    ["go", "build", "-ldflags", "-s -w", "-o", f"angra_core{ext}", "main.go"],
+                    cwd="go_core", check=True
+                )
 
             logger.info("⚡ [GOLANG]: Запуск сетевого пайплайна (L4 -> L7 -> Champion)...")
 
@@ -268,46 +302,53 @@ class Inspector:
                 f"./angra_core{ext}", f"../{input_file}", f"../{output_file}",
                 cwd="go_core",
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
             stdout, stderr = await proc.communicate()
 
             if stdout:
-                for line in stdout.decode().splitlines():
+                for line in stdout.decode(errors="replace").splitlines():
                     if line.strip():
                         logger.info(line.strip())
 
             if proc.returncode != 0:
-                logger.error(f"✘ [GOLANG CRASH]: {stderr.decode()}")
+                logger.error(f"✘ [GOLANG CRASH]: {stderr.decode(errors='replace')}")
                 return []
 
             with open(output_file, "r", encoding="utf-8") as f:
                 valid_nodes_data = json.load(f)
-                if not valid_nodes_data:
-                    valid_nodes_data = []
+            if not valid_nodes_data:
+                valid_nodes_data = []
 
-            valid_nodes = []
+            valid_nodes: List[ProxyNode] = []
             for data in valid_nodes_data:
                 data.pop("ready_outbound", None)
-                valid_nodes.append(ProxyNode(**data))
+                try:
+                    valid_nodes.append(ProxyNode(**data))
+                except Exception as exc:
+                    logger.debug(f"ProxyNode reconstruct error: {exc}")
 
         except Exception as e:
-            logger.exception(f"✘[СБОЙ ИНТЕГРАЦИИ GO]: {e}")
+            logger.exception(f"✘ [СБОЙ ИНТЕГРАЦИИ GO]: {e}")
             return []
         finally:
-            if os.path.exists(input_file):
-                os.remove(input_file)
-            if os.path.exists(output_file):
-                os.remove(output_file)
+            for path in (input_file, output_file):
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                except OSError:
+                    pass
 
         nodes = valid_nodes
         total = len(nodes)
-        self.l4_dropped += (len(payload_nodes) - total)
+        self.l4_dropped += max(0, len(payload_nodes) - total)
 
         if nodes:
             await self._resolve_geo(nodes)
 
-        logger.info(f"✔ [ANGRA ORCHESTRATOR]: Инспекция полностью завершена. Итого выжило: {total}")
+        logger.info(
+            f"✔ [ANGRA ORCHESTRATOR]: Инспекция полностью завершена. Итого выжило: {total}"
+        )
         return valid_nodes
 
     async def champion_run(self, nodes: List[ProxyNode]) -> float:
