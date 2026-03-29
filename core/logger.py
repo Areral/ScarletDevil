@@ -25,7 +25,6 @@ logger.add(
 
 
 class GHA:
-
     _W = 64
 
     @staticmethod
@@ -56,30 +55,30 @@ class GHA:
 
     @classmethod
     def _box_top(cls) -> None:
-        print(f"  ╔{'═' * cls._W}╗", flush=True)
+        print(f"  ╔{'═' * (cls._W + 2)}╗", flush=True)
 
     @classmethod
     def _box_bot(cls) -> None:
-        print(f"  ╚{'═' * cls._W}╝", flush=True)
+        print(f"  ╚{'═' * (cls._W + 2)}╝", flush=True)
 
     @classmethod
     def _box_div(cls) -> None:
-        print(f"  ╠{'═' * cls._W}╣", flush=True)
+        print(f"  ╠{'═' * (cls._W + 2)}╣", flush=True)
 
     @classmethod
     def _box_title(cls, text: str) -> None:
-        inner = cls._pad(text, cls._W - 2)
+        inner = cls._pad(text, cls._W)
         print(f"  ║  {inner}  ║", flush=True)
 
     @classmethod
     def _box_row(cls, label: str, value: str) -> None:
         content = f"  {label:<24}{value}"
-        padded = cls._pad(content, cls._W - 2)
+        padded = cls._pad(content, cls._W)
         print(f"  ║  {padded}  ║", flush=True)
 
     @classmethod
     def _box_blank(cls) -> None:
-        print(f"  ║{' ' * cls._W}  ║", flush=True)
+        print(f"  ║{' ' * (cls._W + 4)}║", flush=True)
 
     @classmethod
     def drone_header(cls, drone_idx: int, drone_total: int) -> None:
