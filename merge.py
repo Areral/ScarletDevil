@@ -2,6 +2,7 @@
 import os
 import json
 import glob
+import base64
 import datetime
 import asyncio
 import aiohttp
@@ -11,6 +12,20 @@ import core.logger
 from core.logger import GHA
 
 from core.settings import CONFIG
+
+
+def _vmess_dedup_key(line: str) -> str:
+    if not line.startswith("vmess://"):
+        return line.split("#")[0]
+    try:
+        raw = line[8:]
+        padded = raw + "=" * (-len(raw) % 4)
+        data = json.loads(base64.b64decode(padded).decode("utf-8"))
+        data.pop("ps", None)
+        normalized = json.dumps(data, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
+        return "vmess::" + base64.b64encode(normalized.encode()).decode()
+    except Exception:
+        return line.split("#")[0]
 
 
 async def send_telegram_report(stats: dict) -> None:
@@ -122,9 +137,9 @@ def merge_subscription_files(pattern: str, output_file: str, title: str) -> int:
                     line = raw.strip()
                     if not line or line.startswith("#"):
                         continue
-                    base_uri = line.split("#")[0]
-                    if base_uri not in unique_map:
-                        unique_map[base_uri] = line
+                    dedup_key = _vmess_dedup_key(line)
+                    if dedup_key not in unique_map:
+                        unique_map[dedup_key] = line
         except Exception:
             pass
 
