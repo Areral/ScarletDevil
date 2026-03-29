@@ -47,8 +47,6 @@ var (
 )
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
-
 	cidrs := []string{
 		"1.1.1.0/24", "1.0.0.0/24", "8.8.8.0/24", "8.8.4.0/24",
 		"162.159.0.0/16", "104.16.0.0/12", "172.64.0.0/13",
@@ -288,6 +286,8 @@ func processSingboxBatch(
 
 	portToNode := make(map[int]map[string]interface{}, len(batch))
 
+	firstValidPort := -1
+
 	for i, node := range batch {
 		readyOutbound, ok := node["ready_outbound"].(map[string]interface{})
 		if !ok {
@@ -297,6 +297,7 @@ func processSingboxBatch(
 		readyOutbound["tag"] = tag
 
 		localPort := basePort + i
+
 		inbounds = append(inbounds, map[string]interface{}{
 			"type":        "socks",
 			"tag":         fmt.Sprintf("in-%d", i),
@@ -309,9 +310,13 @@ func processSingboxBatch(
 			"outbound": tag,
 		})
 		portToNode[localPort] = node
+
+		if firstValidPort == -1 {
+			firstValidPort = localPort
+		}
 	}
 
-	if len(portToNode) == 0 {
+	if firstValidPort == -1 || len(portToNode) == 0 {
 		return nil, false
 	}
 
@@ -365,7 +370,7 @@ func processSingboxBatch(
 	portReady := false
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", basePort), 300*time.Millisecond)
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", firstValidPort), 300*time.Millisecond)
 		if err == nil {
 			conn.Close()
 			portReady = true
@@ -442,11 +447,11 @@ func getSocksClient(port int, timeout time.Duration, verifySSL bool) *http.Clien
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialer.Dial(network, addr)
 		},
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: !verifySSL},
-		DisableKeepAlives:   true,
-		DisableCompression:  true,
-		MaxIdleConns:        1,
-		IdleConnTimeout:     5 * time.Second,
+		TLSClientConfig:    &tls.Config{InsecureSkipVerify: !verifySSL},
+		DisableKeepAlives:  true,
+		DisableCompression: true,
+		MaxIdleConns:       1,
+		IdleConnTimeout:    5 * time.Second,
 	}
 	return &http.Client{Transport: transport, Timeout: timeout}
 }
@@ -501,13 +506,10 @@ func testHTTPPing(port int) (int, bool) {
 			continue
 		}
 
-		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 512))
 		resp.Body.Close()
 
 		if resp.StatusCode != 204 {
-			continue
-		}
-		if len(bodyBytes) > 0 {
 			continue
 		}
 

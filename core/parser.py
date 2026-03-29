@@ -153,7 +153,7 @@ class LinkParser:
             actual_sni = conf.server
 
         if actual_sni:
-            actual_sni = actual_sni.strip("[] \t")
+            actual_sni = actual_sni.split(",")[0].strip().strip("[] \t")
             try:
                 ipaddress.ip_address(actual_sni)
                 actual_sni = None
@@ -516,6 +516,9 @@ class LinkParser:
         else:
             sources = list(dict.fromkeys(s.strip() for s in raw_sources.splitlines() if s.strip()))
 
+        for url in sources:
+            self.metrics[url] = {"parsed": 0, "alive": 0}
+
         connector = aiohttp.TCPConnector(limit=15, ttl_dns_cache=300)
         async with aiohttp.ClientSession(connector=connector) as session:
             results = await asyncio.gather(*[self._fetch_url_with_retry(session, url) for url in sources])
@@ -572,6 +575,8 @@ class LinkParser:
                             nodes.append(node)
                             seen_ids.add(node.strict_id)
                             machine_counts[m_id] = machine_counts.get(m_id, 0) + 1
+
+                            self.metrics[url]["parsed"] = self.metrics[url].get("parsed", 0) + 1
 
         logger.info(f"✔[ПАРСИНГ]: Завершено. Собрано оригинальных узлов: {len(nodes)}")
         return nodes

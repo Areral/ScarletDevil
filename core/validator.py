@@ -14,7 +14,7 @@ class RKNValidator:
 
     @classmethod
     async def _fetch_list(cls, session: aiohttp.ClientSession, url: str) -> str:
-        if not url: 
+        if not url:
             return ""
         try:
             async with session.get(url) as resp:
@@ -30,31 +30,33 @@ class RKNValidator:
         cls.ips_wl.clear()
         cls.networks_wl.clear()
         cls._is_loaded = False
-        
+
         dom_urls = CONFIG.whitelist.get("domains_urls", [])
         if not dom_urls and CONFIG.whitelist.get("domains_url"):
             dom_urls = [CONFIG.whitelist.get("domains_url")]
-            
+
         ip_urls = CONFIG.whitelist.get("ips_urls", [])
         if not ip_urls and CONFIG.whitelist.get("ips_url"):
             ip_urls = [CONFIG.whitelist.get("ips_url")]
-        
+
         timeout = aiohttp.ClientTimeout(total=30)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             tasks = []
-            for url in dom_urls: tasks.append(cls._fetch_list(session, url))
-            for url in ip_urls: tasks.append(cls._fetch_list(session, url))
-            
+            for url in dom_urls:
+                tasks.append(cls._fetch_list(session, url))
+            for url in ip_urls:
+                tasks.append(cls._fetch_list(session, url))
+
             results = await asyncio.gather(*tasks)
-            
+
         dom_results = results[:len(dom_urls)]
         ip_results = results[len(dom_urls):]
 
         for text in dom_results:
             if text:
                 cls.domains_wl.update({
-                    line.strip().lower() 
-                    for line in text.splitlines() 
+                    line.strip().lower()
+                    for line in text.splitlines()
                     if line.strip() and not line.startswith('#')
                 })
 
@@ -62,11 +64,11 @@ class RKNValidator:
         for text in ip_results:
             if text:
                 all_ip_lines.update({
-                    line.strip().lower() 
-                    for line in text.splitlines() 
+                    line.strip().lower()
+                    for line in text.splitlines()
                     if line.strip() and not line.startswith('#')
                 })
-                
+
         unique_nets = set()
         for item in all_ip_lines:
             if '/' in item:
@@ -78,7 +80,7 @@ class RKNValidator:
                     pass
             else:
                 cls.ips_wl.add(item)
-                
+
         cls.networks_wl = list(unique_nets)
 
         if cls.domains_wl or cls.ips_wl or cls.networks_wl:
@@ -91,19 +93,22 @@ class RKNValidator:
     def check_bs(cls, node: ProxyNode) -> bool:
         if node.config.security != "reality":
             return False
-            
+
         if not cls._is_loaded:
             return False
-            
-        target = node.config.sni or node.config.host or node.config.server
-        if not target: 
+
+        raw_target = node.config.sni or node.config.host or node.config.server
+        if not raw_target:
             return False
-            
-        target = target.lower().strip("[]")
-        
+
+        target = raw_target.split(",")[0].strip().lower().strip("[]")
+
+        if not target:
+            return False
+
         if target in cls.domains_wl or target in cls.ips_wl:
             return True
-            
+
         try:
             ip_obj = ipaddress.ip_address(target)
             for net in cls.networks_wl:
