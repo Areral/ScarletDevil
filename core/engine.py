@@ -11,18 +11,11 @@ from loguru import logger
 from typing import List, Optional, Dict
 from core.models import ProxyNode
 from core.settings import CONFIG
+from core.util import is_valid_uuid
 
 
 class BatchEngine:
     _GEO_CACHE: Dict[str, str] = {}
-
-    @staticmethod
-    def _is_valid_uuid(val: str) -> bool:
-        try:
-            uuid.UUID(str(val))
-            return True
-        except ValueError:
-            return False
 
     @staticmethod
     def _node_to_outbound(node: ProxyNode, tag: str) -> Optional[dict]:
@@ -31,14 +24,14 @@ class BatchEngine:
 
         try:
             if node.protocol == "vless":
-                if not c.uuid or not BatchEngine._is_valid_uuid(c.uuid):
+                if not c.uuid or not is_valid_uuid(c.uuid):
                     return None
                 base.update({"type": "vless", "uuid": c.uuid})
                 if c.flow:
                     base["flow"] = c.flow
 
             elif node.protocol == "vmess":
-                if not c.uuid or not BatchEngine._is_valid_uuid(c.uuid):
+                if not c.uuid or not is_valid_uuid(c.uuid):
                     return None
                 base.update({
                     "type": "vmess",
@@ -368,6 +361,3 @@ class Inspector:
             await self._resolve_geo(valid_nodes)
 
         return valid_nodes
-
-    async def champion_run(self, nodes: List[ProxyNode]) -> float:
-        return max((n.speed for n in nodes), default=0.0)

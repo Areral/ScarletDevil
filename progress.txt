@@ -43,3 +43,29 @@ Started: Thu Jun  4 04:19:02 RTZ 2026
   `python -m py_compile main.py merge.py core/*.py` OK. No tests/ dir yet (US-008).
 - **Learnings for future iterations:** see ## Codebase Patterns above.
 ---
+
+## Thu Jun  4 - US-002 (Remove dead code and extract shared UUID util)
+- Extracted the duplicated UUID validator into `core/util.py` as a module-level
+  `is_valid_uuid(val) -> bool` (AUDIT §2.5).
+- `core/parser.py`: removed `LinkParser._is_valid_uuid`, now imports
+  `is_valid_uuid` from `core.util`; updated the call site in `_normalize_config`.
+  Dropped the now-unused `import uuid` (parser no longer references the module;
+  `uuid=uid` call-args are keyword names, not the module).
+- `core/engine.py`: removed `BatchEngine._is_valid_uuid` and the two call sites
+  now use `is_valid_uuid`; kept `import uuid` (still used by `uuid.uuid4()` for
+  the go_in/go_out temp-file id). Removed the unused `Inspector.champion_run`
+  method (champion phase lives in Go; grep confirmed zero callers in-repo).
+- **Checks:** `python -m py_compile main.py merge.py core/*.py` OK.
+  `python -c "import core.util"` OK (returns True/False correctly). Full
+  `import core.parser, core.engine` fails LOCALLY only — pydantic 1.x vs the
+  pinned 2.x `field_validator` (documented caveat); validated in CI.
+- **Learnings for future iterations:**
+  - Shared helpers belong in `core/util.py` now — import `is_valid_uuid` from
+    there rather than re-defining. `core.util` has no heavy deps (just stdlib
+    `uuid`), so it imports cleanly even on the local pydantic-mismatched env —
+    handy as the one Python module you can actually `import`-test locally.
+  - When removing a method that used a stdlib module, re-grep `module\.` in that
+    file before deleting the import (parser's `uuid` was orphaned; engine's was
+    not, due to `uuid.uuid4()`).
+---
+

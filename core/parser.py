@@ -7,7 +7,6 @@ import re
 import html
 import asyncio
 import hashlib
-import uuid
 from typing import List, Optional
 import aiohttp
 from loguru import logger
@@ -15,6 +14,7 @@ from loguru import logger
 from core.models import ProxyNode, ProxyConfig
 from core.settings import CONFIG
 from core.validator import RKNValidator
+from core.util import is_valid_uuid
 
 SS_VALID_METHODS = {
     "aes-128-gcm", "aes-192-gcm", "aes-256-gcm",
@@ -110,14 +110,6 @@ class LinkParser:
             is_valid_domain = bool(LinkParser.HOST_RE.match(h)) and len(h) >= 4
             return is_valid_domain
 
-    @staticmethod
-    def _is_valid_uuid(val: str) -> bool:
-        try:
-            uuid.UUID(str(val))
-            return True
-        except ValueError:
-            return False
-
     @classmethod
     def _is_garbage(cls, line: str) -> bool:
         ll = line.lower()
@@ -133,7 +125,7 @@ class LinkParser:
     @staticmethod
     def _normalize_config(conf: ProxyConfig, protocol: str) -> Optional[ProxyConfig]:
         if protocol in ("vless", "vmess"):
-            if not conf.uuid or not LinkParser._is_valid_uuid(conf.uuid):
+            if not conf.uuid or not is_valid_uuid(conf.uuid):
                 return None
 
         if not conf.type or conf.type.lower().strip() in ("none", "null", ""):

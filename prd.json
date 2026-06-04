@@ -31,7 +31,7 @@
         "`python -c \"import core.parser, core.engine, core.util\"` runs without error"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "AUDIT.md §2.5"
     },
     {
