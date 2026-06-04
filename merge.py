@@ -117,6 +117,9 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
         node_stats = {
             "total":     int(total_alive),
             "max_speed": int(top_speed),
+            "avg_speed": round(stats.get("avg_speed", 0.0), 1),
+            "median_speed": round(stats.get("median_speed", 0.0), 1),
+            "speed_p90": round(stats.get("speed_percentile_90", 0.0), 1),
             "bs":        int(stats.get("bs_count", 0)),
             "chs":       int(stats.get("chs_count", 0)),
             "vless":     int(stats.get("vless_count", 0)),
@@ -135,6 +138,9 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
                .replace("{{UPDATE_TIME}}", now.strftime("%d.%m %H:%M"))
                .replace("{{PROXY_COUNT}}", str(total_alive))
                .replace("{{MAX_SPEED}}", str(int(top_speed)))
+               .replace("{{AVG_SPEED}}", str(round(stats.get("avg_speed", 0.0), 1)))
+               .replace("{{MEDIAN_SPEED}}", str(round(stats.get("median_speed", 0.0), 1)))
+               .replace("{{SPEED_P90}}", str(round(stats.get("speed_percentile_90", 0.0), 1)))
                .replace("{{BS_COUNT}}", str(stats.get("bs_count", 0)))
                .replace("{{CHS_COUNT}}", str(stats.get("chs_count", 0)))
                .replace("{{VLESS_COUNT}}", str(stats.get("vless_count", 0)))
@@ -216,10 +222,14 @@ def main() -> None:
         "parsed":       0,
         "l4_dropped":   0,
         "top_speed":    0.0,
+        "avg_speed":    0.0,
+        "median_speed": 0.0,
+        "speed_percentile_90": 0.0,
         "dead_sources": set(),
         "durations":    {},
         "unique_alive": 0,
         "bs_count":     0,
+        "country_stats": [],
     }
 
     GHA.group("① COLLECT — Reading Drone Telemetry")
@@ -248,6 +258,34 @@ def main() -> None:
             stats["durations"][shard_idx] = dur
             for src in data.get("dead_sources", []):
                 stats["dead_sources"].add(src)
+
+            # Aggregate speed stats (US-C04) — weighted by drone alive count
+            drone_alive = alive
+            drone_avg = data.get("avg_speed", 0.0)
+            drone_med = data.get("median_speed", 0.0)
+            drone_p90 = data.get("speed_percentile_90", 0.0)
+            if drone_alive > 0:
+                # Weighted running average for avg_speed
+                old_total = stats.get("_alive_for_avg", 0)
+                old_avg = stats["avg_speed"]
+                new_total = old_total + drone_alive
+                stats["avg_speed"] = (old_avg * old_total + drone_avg * drone_alive) / new_total if new_total > 0 else 0.0
+                stats["_alive_for_avg"] = new_total
+                # For median/p90: track the best across drones (best-effort aggregation)
+                if drone_med > stats["median_speed"]:
+                    stats["median_speed"] = drone_med
+                if drone_p90 > stats["speed_percentile_90"]:
+                    stats["speed_percentile_90"] = drone_p90
+
+            # Aggregate country stats from drone GeoIP data (US-C04)
+            drone_countries = data.get("country_stats", [])
+            if drone_countries:
+                merged_countries = {c["code"]: c["count"] for c in stats["country_stats"]}
+                for c in drone_countries:
+                    code = c["code"]
+                    merged_countries[code] = merged_countries.get(code, 0) + c["count"]
+                sorted_merged = sorted(merged_countries.items(), key=lambda x: x[1], reverse=True)[:10]
+                stats["country_stats"] = [{"code": cc, "count": cnt, "flag": ""} for cc, cnt in sorted_merged]
 
             logger.info(
                 f"  Drone {shard_idx:<4}  parsed={parsed:>6,}  "
@@ -332,8 +370,11 @@ def main() -> None:
         "Scarlet Devil | Hysteria2",
     )
 
-    # Build country distribution from the merged all-subscriptions file
-    stats["country_stats"] = _extract_country_stats("sub_all.txt")
+    # Build country distribution: prefer drone GeoIP data, fall back to URL parsing
+    if not stats["country_stats"]:
+        stats["country_stats"] = _extract_country_stats("sub_all.txt")
+    else:
+        logger.info(f"  🌍 Country stats from GeoIP: {len(stats['country_stats'])} countries")
     GHA.endgroup()
 
     GHA.group("③ BUILD — Compiling Dashboard (index.html)")

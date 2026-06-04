@@ -320,6 +320,7 @@ class Inspector:
                     "https://speed.cloudflare.com/__down?bytes=10485760",
                 ),
                 "batch_size": getattr(CONFIG, "BATCH_SIZE", 150),
+                "champion_top_n": getattr(CONFIG, "CHAMPION_TOP_N", 20),
             },
             "nodes": payload_nodes,
         }

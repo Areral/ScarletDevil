@@ -27,6 +27,7 @@ type EngineSettings struct {
 	SpeedtestUrl     string   `json:"speedtest_url"`
 	ChampionTestUrl  string   `json:"champion_test_url"`
 	BatchSize        int      `json:"batch_size"`
+	ChampionTopN     int      `json:"champion_top_n"`
 }
 
 type InputPayload struct {
@@ -891,7 +892,10 @@ func runChampionPhase(nodes []map[string]interface{}) {
 		return sI > sJ
 	})
 
-	limit := 5
+	limit := globalSettings.ChampionTopN
+	if limit <= 0 {
+		limit = 20
+	}
 	if len(nodes) < limit {
 		limit = len(nodes)
 	}

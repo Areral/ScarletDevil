@@ -18,6 +18,7 @@ class AppSettings(BaseSettings):
     app: Dict[str, Any] = {}
     whitelist: Dict[str, Any] = {}
     BATCH_SIZE: int = 100
+    CHAMPION_TOP_N: int = 20
 
     model_config = SettingsConfigDict(
         env_file=".env",

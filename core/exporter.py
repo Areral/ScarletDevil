@@ -246,6 +246,10 @@ class Exporter:
         l4_retry_recovered: int = 0,
         l7_stats: Optional[Dict[str, int]] = None,
         source_yields: Optional[Dict[str, dict]] = None,
+        avg_speed: float = 0.0,
+        median_speed: float = 0.0,
+        speed_percentile_90: float = 0.0,
+        country_stats: Optional[List[dict]] = None,
     ):
         logger.info(
             f"Exporter: Старт сохранения {len(nodes)} узлов в физические файлы "
@@ -293,6 +297,9 @@ class Exporter:
             "parsed": parsed_count,
             "alive": len(nodes),
             "top_speed": top_speed,
+            "avg_speed": round(avg_speed, 1),
+            "median_speed": round(median_speed, 1),
+            "speed_percentile_90": round(speed_percentile_90, 1),
             "duration": duration,
             "l4_dropped": l4_dropped,
             "l4_failure_reasons": l4_failure_reasons or {},
@@ -301,6 +308,7 @@ class Exporter:
             "l7_stats": l7_stats or {},
             "dead_sources": list(dead_sources) if dead_sources else [],
             "source_yields": source_yields or {},
+            "country_stats": country_stats or [],
         }
 
         try:

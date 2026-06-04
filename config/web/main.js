@@ -1883,12 +1883,24 @@ function initStats() {
     // Render speed summary
     var maxSpeed = (node && typeof node.max_speed === 'number')
         ? node.max_speed : (statsData.getAttribute('data-max-speed') || '—');
+    var avgSpeed = (node && typeof node.avg_speed === 'number')
+        ? node.avg_speed : (statsData.getAttribute('data-avg-speed') || '—');
+    var medianSpeed = (node && typeof node.median_speed === 'number')
+        ? node.median_speed : (statsData.getAttribute('data-median-speed') || '—');
+    var speedP90 = (node && typeof node.speed_p90 === 'number')
+        ? node.speed_p90 : (statsData.getAttribute('data-speed-p90') || '—');
     var totalNodes = (node && typeof node.total === 'number')
         ? node.total : (statsData.getAttribute('data-total-nodes') || '—');
     var sumMax = document.getElementById('sum-max-speed');
+    var sumAvg = document.getElementById('sum-avg-speed');
+    var sumMed = document.getElementById('sum-median-speed');
+    var sumP90 = document.getElementById('sum-p90-speed');
     var sumTotal = document.getElementById('sum-total');
     var sumBS = document.getElementById('sum-bs');
     if (sumMax) sumMax.textContent = maxSpeed + ' Mbps';
+    if (sumAvg) sumAvg.textContent = avgSpeed + ' Mbps';
+    if (sumMed) sumMed.textContent = medianSpeed + ' Mbps';
+    if (sumP90) sumP90.textContent = speedP90 + ' Mbps';
     if (sumTotal) sumTotal.textContent = totalNodes;
     if (sumBS) sumBS.textContent = counts.bs;
 }

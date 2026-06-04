@@ -340,6 +340,9 @@
                      data-ss-count="{{SS_COUNT}}"
                      data-hy2-count="{{HY2_COUNT}}"
                      data-max-speed="{{MAX_SPEED}}"
+                     data-avg-speed="{{AVG_SPEED}}"
+                     data-median-speed="{{MEDIAN_SPEED}}"
+                     data-speed-p90="{{SPEED_P90}}"
                      data-total-nodes="{{PROXY_COUNT}}"
                      data-country-stats='{{COUNTRY_STATS_JSON}}'
                      data-node-stats='{{NODE_STATS_JSON}}'
@@ -431,6 +434,18 @@
                             <div class="summary-item">
                                 <span class="summary-label">Макс. скорость</span>
                                 <span class="summary-value text-touhou" id="sum-max-speed">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Средняя скорость</span>
+                                <span class="summary-value" id="sum-avg-speed">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Медианная скорость</span>
+                                <span class="summary-value" id="sum-median-speed">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">90-й перцентиль</span>
+                                <span class="summary-value" id="sum-p90-speed">—</span>
                             </div>
                             <div class="summary-item">
                                 <span class="summary-label">Всего живых узлов</span>

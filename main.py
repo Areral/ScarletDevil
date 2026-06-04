@@ -98,11 +98,34 @@ async def main() -> None:
         bs_count = sum(1 for n in alive_nodes if n.is_bs)
         top_speed = max((n.speed for n in alive_nodes), default=0.0)
 
+        # Compute speed distribution stats (US-C04)
+        speeds = sorted([n.speed for n in alive_nodes if n.speed > 0])
+        avg_speed = sum(speeds) / len(speeds) if speeds else 0.0
+        if speeds:
+            mid = len(speeds) // 2
+            median_speed = speeds[mid] if len(speeds) % 2 == 1 else (speeds[mid - 1] + speeds[mid]) / 2
+            p90_idx = int(len(speeds) * 0.9)
+            speed_p90 = speeds[min(p90_idx, len(speeds) - 1)]
+        else:
+            median_speed = 0.0
+            speed_p90 = 0.0
+
+        # Compute country distribution from GeoIP data (US-C04)
+        country_counts: dict = {}
+        for n in alive_nodes:
+            cc = (n.country or "UN").strip().upper()
+            if len(cc) == 2 and cc.isalpha():
+                country_counts[cc] = country_counts.get(cc, 0) + 1
+        sorted_countries = sorted(country_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        country_stats = [{"code": cc, "count": cnt, "flag": ""} for cc, cnt in sorted_countries]
+
         logger.info(f"  Unique alive     {len(alive_nodes):>8,}  nodes")
         logger.info(f"  БС (whitelist)   {bs_count:>8,}  nodes")
         logger.info(f"  ЧС (blacklist)   {len(alive_nodes) - bs_count:>8,}  nodes")
         logger.info(f"  Dead sources     {len(dead_sources):>8,}")
         logger.info(f"  ⚡ Top speed      {top_speed:>8.1f}  Mbps")
+        logger.info(f"  📊 Avg/Med/P90    {avg_speed:>6.1f} / {median_speed:>6.1f} / {speed_p90:>6.1f}  Mbps")
+        logger.info(f"  🌍 Top countries  {len(country_stats)}  ({', '.join(f'{c['code']}:{c['count']}' for c in country_stats[:5])})")
         GHA.endgroup()
 
         GHA.group("⑤ EXPORT — Writing Subscription Files")
@@ -119,6 +142,10 @@ async def main() -> None:
             l4_retry_recovered=getattr(inspector, "l4_retry_recovered", 0),
             l7_stats=getattr(inspector, "l7_stats", {}),
             source_yields=source_yields,
+            avg_speed=avg_speed,
+            median_speed=median_speed,
+            speed_percentile_90=speed_p90,
+            country_stats=country_stats,
         )
         GHA.endgroup()
 

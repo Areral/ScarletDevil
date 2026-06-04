@@ -1667,15 +1667,15 @@ section:last-of-type { border-bottom: none; }
                 <div class="dashboard">
                     <div class="stat-panel">
                         <div class="stat-title"><i class="fa-solid fa-gauge-high"></i> Max Speed</div>
-                        <div class="stat-value text-touhou">469<span>Mbps</span></div>
+                        <div class="stat-value text-touhou">{{MAX_SPEED}}<span>Mbps</span></div>
                     </div>
                     <div class="stat-panel">
                         <div class="stat-title"><i class="fa-solid fa-server"></i> Active Nodes</div>
-                        <div class="stat-value">674<span>UP</span></div>
+                        <div class="stat-value">{{PROXY_COUNT}}<span>UP</span></div>
                     </div>
                     
                     <div class="sys-log">
-                        <div class="line">> last_sync: <span class="sys-log-time" data-utc="2026-06-04T21:47:26.024479+00:00">04.06 21:47 MSK</span></div>
+                        <div class="line">> last_sync: <span class="sys-log-time" data-utc="{{UPDATE_TIME_ISO}}">{{UPDATE_TIME}} MSK</span></div>
                         <div class="line">> protocols: <span>VLESS, VMESS, TROJAN, SS, HY2</span></div>
                         <div class="line">> obfuscation: <span class="magic">REALITY_ACTIVE</span></div>
                     </div>
@@ -1843,17 +1843,20 @@ section:last-of-type { border-bottom: none; }
 
                 <!-- Stats data from merge.py -->
                 <div id="stats-data"
-                     data-bs-count="95"
-                     data-chs-count="579"
-                     data-vless-count="463"
-                     data-vmess-count="36"
-                     data-trojan-count="66"
-                     data-ss-count="107"
-                     data-hy2-count="2"
-                     data-max-speed="469"
-                     data-total-nodes="674"
-                     data-country-stats='[]'
-                     data-node-stats='{}'
+                     data-bs-count="{{BS_COUNT}}"
+                     data-chs-count="{{CHS_COUNT}}"
+                     data-vless-count="{{VLESS_COUNT}}"
+                     data-vmess-count="{{VMESS_COUNT}}"
+                     data-trojan-count="{{TROJAN_COUNT}}"
+                     data-ss-count="{{SS_COUNT}}"
+                     data-hy2-count="{{HY2_COUNT}}"
+                     data-max-speed="{{MAX_SPEED}}"
+                     data-avg-speed="{{AVG_SPEED}}"
+                     data-median-speed="{{MEDIAN_SPEED}}"
+                     data-speed-p90="{{SPEED_P90}}"
+                     data-total-nodes="{{PROXY_COUNT}}"
+                     data-country-stats='{{COUNTRY_STATS_JSON}}'
+                     data-node-stats='{{NODE_STATS_JSON}}'
                      style="display:none;">
                 </div>
 
@@ -1942,6 +1945,18 @@ section:last-of-type { border-bottom: none; }
                             <div class="summary-item">
                                 <span class="summary-label">Макс. скорость</span>
                                 <span class="summary-value text-touhou" id="sum-max-speed">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Средняя скорость</span>
+                                <span class="summary-value" id="sum-avg-speed">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Медианная скорость</span>
+                                <span class="summary-value" id="sum-median-speed">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">90-й перцентиль</span>
+                                <span class="summary-value" id="sum-p90-speed">—</span>
                             </div>
                             <div class="summary-item">
                                 <span class="summary-label">Всего живых узлов</span>
@@ -4449,12 +4464,24 @@ function initStats() {
     // Render speed summary
     var maxSpeed = (node && typeof node.max_speed === 'number')
         ? node.max_speed : (statsData.getAttribute('data-max-speed') || '—');
+    var avgSpeed = (node && typeof node.avg_speed === 'number')
+        ? node.avg_speed : (statsData.getAttribute('data-avg-speed') || '—');
+    var medianSpeed = (node && typeof node.median_speed === 'number')
+        ? node.median_speed : (statsData.getAttribute('data-median-speed') || '—');
+    var speedP90 = (node && typeof node.speed_p90 === 'number')
+        ? node.speed_p90 : (statsData.getAttribute('data-speed-p90') || '—');
     var totalNodes = (node && typeof node.total === 'number')
         ? node.total : (statsData.getAttribute('data-total-nodes') || '—');
     var sumMax = document.getElementById('sum-max-speed');
+    var sumAvg = document.getElementById('sum-avg-speed');
+    var sumMed = document.getElementById('sum-median-speed');
+    var sumP90 = document.getElementById('sum-p90-speed');
     var sumTotal = document.getElementById('sum-total');
     var sumBS = document.getElementById('sum-bs');
     if (sumMax) sumMax.textContent = maxSpeed + ' Mbps';
+    if (sumAvg) sumAvg.textContent = avgSpeed + ' Mbps';
+    if (sumMed) sumMed.textContent = medianSpeed + ' Mbps';
+    if (sumP90) sumP90.textContent = speedP90 + ' Mbps';
     if (sumTotal) sumTotal.textContent = totalNodes;
     if (sumBS) sumBS.textContent = counts.bs;
 }
