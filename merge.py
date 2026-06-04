@@ -113,10 +113,10 @@ def build_html(total_alive: int, top_speed: float) -> None:
         html_out = (
             tpl.replace("{{INJECT_CSS}}", css)
                .replace("{{INJECT_JS}}", js)
+               .replace("{{UPDATE_TIME_ISO}}", now.isoformat())
                .replace("{{UPDATE_TIME}}", now.strftime("%d.%m %H:%M"))
                .replace("{{PROXY_COUNT}}", str(total_alive))
                .replace("{{MAX_SPEED}}", str(int(top_speed)))
-               .replace("{{SUB_LINK}}", f"{public_url}/sub")
         )
         with open("index.html", "w", encoding="utf-8") as f:
             f.write(html_out)

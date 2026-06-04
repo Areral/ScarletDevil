@@ -134,3 +134,34 @@ Branch: ralph/website-overhaul
   - RU-verified plumbing добавлен минимально: модель, exporter, merge, vercel. Логика определения `ru_verified` (какие узлы считать проверенными из РФ) оставлена для US-W08.
 ---
 
+## 2026-06-04 - US-W05
+- **What was implemented:**
+  - **Mobile navigation:** Added hamburger button (visible ≤1024px) that opens a slide-out panel with section links and fun effects. Panel closes on link click, close button, or overlay click. Animated hamburger → X transition.
+  - **Fun-panel mobile:** Changed from `display: none` to smaller buttons (36px, rounded squares) at bottom-left. Effects synced between desktop and mobile via paired button click forwarding.
+  - **Meta/OG tags:** Added `og:title`, `og:description`, `og:image`, `og:type`, `og:url`, `twitter:card`, `twitter:title`, `twitter:description`, and `description` meta tag.
+  - **Favicon:** Emoji-based inline SVG favicon (🦇) — no external file needed.
+  - **Skip-link:** Added hidden skip-link that appears on focus (top of page) for screen reader keyboard navigation. Links to `#main-content`.
+  - **Aria-labels:** Added to all nav buttons, fun-panel buttons, mobile nav links, and dynamically to app cards via MutationObserver. App cards now have `role="button"`, `tabindex="0"`, and keyboard support (Enter/Space).
+  - **Removed dead `{{SUB_LINK}}`:** Removed `.replace("{{SUB_LINK}}", ...)` from `merge.py:build_html()`.
+  - **Fixed Android TV detection:** Changed `ua.includes("tv") || window.innerWidth > 1000` → `ua.includes("tv")` only. Removed spurious width-based heuristic.
+  - **PWA manifest:** Created `manifest.json` with theme_color (#e11d48), background_color (#0f0508), display: standalone, emoji icon.
+  - **External links:** Added `rel="noopener noreferrer"` to Telegram link, footer link, and download button.
+  - **Local time conversion:** Added `{{UPDATE_TIME_ISO}}` to merge.py, `data-utc` attribute on time element, and `initLocalTime()` JS function that converts ISO timestamp to user's local timezone via `toLocaleString('ru-RU', ...)`.
+- **Files changed:** merge.py, config/web/template.html, config/web/style.css, config/web/main.js, vercel.json, prd.json, progress.txt
+- **Files created:** config/web/manifest.json
+- **Pre-existing issues (not caused by this change):**
+  - Go build fails: `missing go.sum entry for golang.org/x/net/proxy` (environment, no Go changes made)
+  - Pydantic import: `field_validator` not in older pydantic version (environment, no Python model changes)
+  - update.yml YAML validation: cp1251 encoding (not UTF-8), pre-existing
+- **Learnings for future iterations:**
+  - `vercel.json` catch-all `/(.*)` → `/index.html` rewrites everything — any new static file (manifest.json) needs an explicit route before the catch-all
+  - Mobile nav pattern: hamburger → slide-out panel with overlay. Panel uses `transform: translateX(100%)` + `transition` for smooth animation. Overlay uses `opacity` transition
+  - Fun button sync: mobile and desktop buttons share state via `.click()` forwarding + class mirroring — avoids duplicating effect logic
+  - `sys-log-time` pattern: server renders ISO timestamp in `data-utc`, client converts to local via `new Date()` + `toLocaleString()`
+  - Accessibility for dynamic content: `MutationObserver` on the app grid adds `aria-label`, `role`, `tabindex`, and keyboard handlers to app cards as they're created
+  - `initScrollSpy()` now handles both desktop nav buttons AND mobile nav links (added `mobileLinks` to the observer)
+  - The `{{SUB_LINK}}` placeholder was dead code — template.html never used it, it was just a no-op replacement in merge.py
+  - Emoji favicon via data URI: `<link rel="icon" href="data:image/svg+xml,...">` — works in all modern browsers, no extra file needed
+  - `window.innerWidth` heuristic for Android TV was unreliable (tablets, landscape phones would falsely trigger). Pure userAgent check (`ua.includes('tv')`) is the correct approach
+---
+

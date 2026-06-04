@@ -3,8 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Scarlet Devil Network — элитная система обхода сетевых барьеров. Автоматический агрегатор и верификатор VPN-конфигураций (VLESS, VMess, Trojan, Shadowsocks, Hysteria2) с проверкой из РФ.">
+    <meta property="og:title" content="Scarlet Devil Network — Элитный обход DPI">
+    <meta property="og:description" content="Агрегатор VPN-конфигураций с многоступенчатой проверкой и обфускацией. VLESS Reality, VMess, Trojan, Hysteria2.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://scarlet-devil.vercel.app/favicon.svg">
+    <meta property="og:url" content="https://scarlet-devil.vercel.app">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Scarlet Devil Network">
+    <meta name="twitter:description" content="Агрегатор и верификатор VPN-конфигураций с обфускацией трафика.">
     <title>Scarlet Devil | Protocol</title>
-    
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+    <link rel="manifest" href="/manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -15,32 +26,35 @@
 </head>
 <body>
 
+    <!-- Accessibility skip-link -->
+    <a href="#main-content" class="skip-link" aria-label="Пропустить навигацию">Пропустить навигацию →</a>
+
     <!-- SCARLET MIST LAYER (Easter Egg) -->
     <div id="mist-layer" class="scarlet-mist-layer"></div>
 
     <!-- БОКОВАЯ НАВИГАЦИЯ -->
     <nav class="side-nav">
-        <button class="nav-btn active" data-target="home">
+        <button class="nav-btn active" data-target="home" aria-label="Перейти к главной секции">
             <span class="nav-label">Nexus</span>
             <div class="nav-dot"></div>
         </button>
-        <button class="nav-btn" data-target="about">
+        <button class="nav-btn" data-target="about" aria-label="Перейти к секции О проекте">
             <span class="nav-label">О проекте</span>
             <div class="nav-dot"></div>
         </button>
-        <button class="nav-btn" data-target="guide">
+        <button class="nav-btn" data-target="guide" aria-label="Перейти к секции Гайд">
             <span class="nav-label">Гайд</span>
             <div class="nav-dot"></div>
         </button>
-        <button class="nav-btn" data-target="theory_bs">
+        <button class="nav-btn" data-target="theory_bs" aria-label="Перейти к секции БС vs ЧС">
             <span class="nav-label">БС vs ЧС</span>
             <div class="nav-dot"></div>
         </button>
-        <button class="nav-btn" data-target="theory_isp">
+        <button class="nav-btn" data-target="theory_isp" aria-label="Перейти к секции Приватность">
             <span class="nav-label">Приватность</span>
             <div class="nav-dot"></div>
         </button>
-        <button class="nav-btn" data-target="contacts">
+        <button class="nav-btn" data-target="contacts" aria-label="Перейти к секции Контакты">
             <span class="nav-label">Контакты</span>
             <div class="nav-dot"></div>
         </button>
@@ -48,12 +62,45 @@
 
     <!-- ИНТЕРАКТИВНАЯ ПАНЕЛЬ ЭФФЕКТОВ -->
     <div class="fun-panel reveal">
-        <button id="btn-mist" class="fun-btn" title="Алый туман"><i class="fa-solid fa-cloud"></i></button>
-        <button id="btn-danmaku" class="fun-btn" title="Даммаку"><i class="fa-solid fa-meteor"></i></button>
-        <button id="btn-bats" class="fun-btn" title="Духи особняка"><i class="fa-solid fa-ghost"></i></button>
+        <button id="btn-mist" class="fun-btn" title="Алый туман" aria-label="Включить алый туман"><i class="fa-solid fa-cloud"></i></button>
+        <button id="btn-danmaku" class="fun-btn" title="Даммаку" aria-label="Включить даммаку"><i class="fa-solid fa-meteor"></i></button>
+        <button id="btn-bats" class="fun-btn" title="Духи особняка" aria-label="Включить духов особняка"><i class="fa-solid fa-ghost"></i></button>
     </div>
 
-    <div class="container">
+    <!-- HAMBURGER BUTTON (mobile only) -->
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Открыть меню навигации">
+        <span></span><span></span><span></span>
+    </button>
+
+    <!-- MOBILE NAVIGATION PANEL -->
+    <div class="mobile-nav-overlay" id="mobile-nav-overlay">
+        <div class="mobile-nav-panel">
+            <div class="mobile-nav-header">
+                <span class="mobile-nav-title"><i class="fa-solid fa-broom"></i> Scarlet Devil</span>
+                <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Закрыть меню">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="mobile-nav-links">
+                <button class="mobile-nav-link" data-target="home" aria-label="Перейти к разделу Nexus">Nexus</button>
+                <button class="mobile-nav-link" data-target="about" aria-label="Перейти к разделу О проекте">О проекте</button>
+                <button class="mobile-nav-link" data-target="guide" aria-label="Перейти к разделу Гайд">Гайд</button>
+                <button class="mobile-nav-link" data-target="theory_bs" aria-label="Перейти к разделу БС vs ЧС">БС vs ЧС</button>
+                <button class="mobile-nav-link" data-target="theory_isp" aria-label="Перейти к разделу Приватность">Приватность</button>
+                <button class="mobile-nav-link" data-target="contacts" aria-label="Перейти к разделу Контакты">Контакты</button>
+            </div>
+            <div class="mobile-nav-fun">
+                <span class="mobile-nav-fun-label">Эффекты</span>
+                <div class="mobile-nav-fun-btns">
+                    <button id="btn-mist-mobile" class="fun-btn-mobile" aria-label="Алый туман" title="Алый туман"><i class="fa-solid fa-cloud"></i></button>
+                    <button id="btn-danmaku-mobile" class="fun-btn-mobile" aria-label="Даммаку" title="Даммаку"><i class="fa-solid fa-meteor"></i></button>
+                    <button id="btn-bats-mobile" class="fun-btn-mobile" aria-label="Духи особняка" title="Духи особняка"><i class="fa-solid fa-ghost"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="main-content">
         
         <!-- HERO & DASHBOARD SECTION -->
         <section id="home">
@@ -82,7 +129,7 @@
                     </div>
                     
                     <div class="sys-log">
-                        <div class="line">> last_sync: <span>{{UPDATE_TIME}} MSK</span></div>
+                        <div class="line">> last_sync: <span class="sys-log-time" data-utc="{{UPDATE_TIME_ISO}}">{{UPDATE_TIME}} MSK</span></div>
                         <div class="line">> protocols: <span>VLESS, VMESS, TROJAN, SS, HY2</span></div>
                         <div class="line">> obfuscation: <span class="magic">REALITY_ACTIVE</span></div>
                     </div>
@@ -107,7 +154,7 @@
                             <h3 style="font-size: 1rem;">1. Выбор клиента</h3>
                         </div>
                         <div class="app-grid" id="app-grid"></div>
-                        <a href="#" target="_blank" id="download-btn" class="btn-secondary" style="width: 100%; border-color: var(--border-light);">
+                        <a href="#" target="_blank" rel="noopener noreferrer" id="download-btn" class="btn-secondary" style="width: 100%; border-color: var(--border-light);">
                             <span><i class="fa-solid fa-download" style="margin-right: 8px; color: var(--touhou-sakura)"></i> Скачать <b id="app-name-display">App</b></span>
                         </a>
 
@@ -246,7 +293,7 @@
                 <h2><i class="fa-brands fa-telegram" style="color: var(--cyber-blue);"></i> Сообщество и Контакты</h2>
                 <div class="text-block text-center py-4">
                     <p>Присоединяйтесь к нашему Telegram-форуму для обсуждения работы ядра, получения помощи по настройке клиентов и общения с другими участниками сети.</p>
-                    <a href="https://t.me/ScDevNetwork" target="_blank" class="btn-primary" style="margin-top: 15px;">
+                    <a href="https://t.me/ScDevNetwork" target="_blank" rel="noopener noreferrer" class="btn-primary" style="margin-top: 15px;">
                         <i class="fa-solid fa-paper-plane"></i> Перейти в Telegram
                     </a>
                 </div>
@@ -267,7 +314,7 @@
         </div>
 
         <div class="footer reveal">
-            Created by <a href="https://t.me/ScarletDevilTeam" target="_blank">Scarlet Devil Team</a> • 2026<br>
+            Created by <a href="https://t.me/ScarletDevilTeam" target="_blank" rel="noopener noreferrer">Scarlet Devil Team</a> • 2026<br>
             <span style="font-size: 0.7rem; color: var(--border-light); margin-top: 5px; display: inline-block;">Powered by Scarlet Devil Mansion Architecture</span>
         </div>
     </div>

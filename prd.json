@@ -88,7 +88,7 @@
         "`python -m py_compile merge.py` проходит"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Критические баги: мобильная навигация отсутствует, clipboard fallback нет, нет meta/og тегов."
     },
     {

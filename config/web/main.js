@@ -946,7 +946,7 @@ let currentAppId = PLATFORMS['windows'][0];
 
 function init() {
     const ua = navigator.userAgent.toLowerCase();
-    if (ua.includes("android") && (ua.includes("tv") || window.innerWidth > 1000)) currentPlatform = 'androidtv';
+    if (ua.includes("android") && ua.includes("tv")) currentPlatform = 'androidtv';
     else if (ua.includes("android")) currentPlatform = 'android';
     else if (ua.includes("iphone") || ua.includes("ipad")) currentPlatform = 'ios';
     else if (ua.includes("macintosh") || ua.includes("mac os")) currentPlatform = 'mac';
@@ -958,6 +958,9 @@ function init() {
     initScrollSpy();
     initReveal();
     initFunPanel();
+    initMobileNav();
+    initLocalTime();
+    initAccessibility();
 }
 
 function switchPlatform(platform) {
@@ -1018,16 +1021,17 @@ function initReveal() {
 function initScrollSpy() {
     const sections = document.querySelectorAll('section');
     const navBtns = document.querySelectorAll('.nav-btn');
+    const mobileLinks = document.querySelectorAll('.mobile-nav-link');
 
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const currentId = entry.target.getAttribute('id');
                 navBtns.forEach(btn => {
-                    btn.classList.remove('active');
-                    if (btn.getAttribute('data-target') === currentId) {
-                        btn.classList.add('active');
-                    }
+                    btn.classList.toggle('active', btn.getAttribute('data-target') === currentId);
+                });
+                mobileLinks.forEach(link => {
+                    link.classList.toggle('active', link.getAttribute('data-target') === currentId);
                 });
             }
         });
@@ -1234,6 +1238,112 @@ function initFunPanel() {
             }, 800);
         }
     });
+}
+
+// --- MOBILE NAVIGATION ---
+function initMobileNav() {
+    const hamburger = document.getElementById('hamburger-btn');
+    const overlay = document.getElementById('mobile-nav-overlay');
+    const closeBtn = document.getElementById('mobile-nav-close');
+    if (!hamburger || !overlay || !closeBtn) return;
+
+    function openMobileNav() {
+        hamburger.classList.add('active');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        // Mirror active state from desktop nav
+        const activeDesktopBtn = document.querySelector('.nav-btn.active');
+        if (activeDesktopBtn) {
+            const target = activeDesktopBtn.getAttribute('data-target');
+            document.querySelectorAll('.mobile-nav-link').forEach(link => {
+                link.classList.toggle('active', link.getAttribute('data-target') === target);
+            });
+        }
+    }
+
+    function closeMobileNav() {
+        hamburger.classList.remove('active');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    hamburger.addEventListener('click', openMobileNav);
+    closeBtn.addEventListener('click', closeMobileNav);
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeMobileNav();
+    });
+
+    // Nav link clicks
+    document.querySelectorAll('.mobile-nav-link').forEach(link => {
+        link.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const target = document.getElementById(targetId);
+            if (target) target.scrollIntoView({ behavior: 'smooth' });
+            closeMobileNav();
+        });
+    });
+
+    // Sync mobile fun buttons with desktop fun buttons
+    const mobileFunBtns = {
+        'btn-mist-mobile': 'btn-mist',
+        'btn-danmaku-mobile': 'btn-danmaku',
+        'btn-bats-mobile': 'btn-bats'
+    };
+    Object.entries(mobileFunBtns).forEach(function([mobileId, desktopId]) {
+        const mobileBtn = document.getElementById(mobileId);
+        const desktopBtn = document.getElementById(desktopId);
+        if (mobileBtn && desktopBtn) {
+            mobileBtn.addEventListener('click', function() {
+                desktopBtn.click();
+                // Reflect state
+                mobileBtn.classList.toggle('active', desktopBtn.classList.contains('active'));
+            });
+        }
+    });
+}
+
+// --- LOCAL TIME CONVERSION ---
+function initLocalTime() {
+    const timeEl = document.querySelector('.sys-log-time');
+    if (!timeEl) return;
+    const utcAttr = timeEl.getAttribute('data-utc');
+    if (!utcAttr) return;
+    try {
+        const date = new Date(utcAttr);
+        if (isNaN(date.getTime())) return;
+        const opts = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
+        const localStr = date.toLocaleString('ru-RU', opts);
+        const tz = date.toLocaleString('ru-RU', { timeZoneName: 'short' }).split(' ').pop();
+        timeEl.textContent = localStr + ' ' + tz;
+        timeEl.style.color = 'var(--cyber-green)';
+    } catch(e) {
+        // Leave server time as fallback
+    }
+}
+
+// --- ACCESSIBILITY ENHANCEMENTS ---
+function initAccessibility() {
+    // Add aria-labels and keyboard support to dynamically generated app cards
+    const appGrid = document.getElementById('app-grid');
+    if (!appGrid) return;
+    const observer = new MutationObserver(function() {
+        document.querySelectorAll('.app-card').forEach(function(card) {
+            if (card.hasAttribute('aria-label')) return;
+            var nameEl = card.querySelector('.app-name');
+            if (nameEl) {
+                card.setAttribute('aria-label', 'Выбрать клиент ' + nameEl.textContent);
+                card.setAttribute('role', 'button');
+                card.setAttribute('tabindex', '0');
+                card.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        card.click();
+                    }
+                });
+            }
+        });
+    });
+    observer.observe(appGrid, { childList: true, subtree: true });
 }
 
 init();

@@ -133,7 +133,17 @@ h1, h2, h3, h4 { font-weight: 800; letter-spacing: -0.5px; }
 .fun-btn:hover { background: rgba(225, 29, 72, 0.2); color: var(--touhou-sakura); border-color: var(--touhou-sakura); transform: translateX(5px); }
 .fun-btn.active { background: var(--touhou-red); color: #fff; border-color: var(--touhou-red); box-shadow: 0 0 15px var(--touhou-red); }
 
-@media (max-width: 1024px) { .fun-panel { display: none; } }
+@media (max-width: 1024px) {
+    .fun-panel {
+        bottom: 16px;
+        left: 16px;
+        gap: 8px;
+    }
+    .fun-btn {
+        width: 36px; height: 36px; font-size: 0.95rem;
+        border-radius: 10px;
+    }
+}
 
 /* --- SIDE NAVIGATION --- */
 .side-nav {
@@ -159,6 +169,215 @@ h1, h2, h3, h4 { font-weight: 800; letter-spacing: -0.5px; }
 }
 
 @media (max-width: 1024px) { .side-nav { display: none; } }
+
+/* --- HAMBURGER & MOBILE NAVIGATION --- */
+.hamburger-btn {
+    display: none;
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 200;
+    width: 44px;
+    height: 44px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: var(--trans);
+    padding: 10px 8px;
+}
+.hamburger-btn span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--text-dim);
+    border-radius: 2px;
+    transition: var(--trans);
+}
+.hamburger-btn:hover {
+    border-color: var(--touhou-sakura);
+    background: rgba(225, 29, 72, 0.15);
+}
+.hamburger-btn:hover span { background: #fff; }
+.hamburger-btn.active span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+}
+.hamburger-btn.active span:nth-child(2) { opacity: 0; }
+.hamburger-btn.active span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+}
+
+@media (max-width: 1024px) { .hamburger-btn { display: flex; } }
+
+.mobile-nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 150;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.mobile-nav-overlay.active { opacity: 1; pointer-events: all; }
+
+.mobile-nav-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 300px;
+    max-width: 85vw;
+    height: 100vh;
+    height: 100dvh;
+    background: #0f0508;
+    border-left: 1px solid var(--border-light);
+    z-index: 151;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 20px;
+    gap: 0;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.6);
+}
+.mobile-nav-overlay.active .mobile-nav-panel { transform: translateX(0); }
+
+.mobile-nav-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+}
+.mobile-nav-title {
+    font-weight: 800;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.mobile-nav-title i { color: var(--touhou-sakura); }
+.mobile-nav-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: var(--trans);
+}
+.mobile-nav-close:hover {
+    background: var(--touhou-red);
+    color: #fff;
+    border-color: var(--touhou-red);
+    transform: rotate(90deg);
+}
+
+.mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+.mobile-nav-link {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: var(--trans);
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+.mobile-nav-link:hover, .mobile-nav-link:focus-visible {
+    background: rgba(225, 29, 72, 0.08);
+    border-color: var(--border);
+    color: #fff;
+}
+.mobile-nav-link.active {
+    background: rgba(225, 29, 72, 0.15);
+    border-color: var(--touhou-red);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(225, 29, 72, 0.1);
+}
+
+/* Mobile nav fun section */
+.mobile-nav-fun {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+}
+.mobile-nav-fun-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-dark);
+    font-weight: 800;
+    display: block;
+    margin-bottom: 12px;
+}
+.mobile-nav-fun-btns {
+    display: flex;
+    gap: 10px;
+}
+.fun-btn-mobile {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--trans);
+}
+.fun-btn-mobile:hover { background: rgba(225, 29, 72, 0.2); color: var(--touhou-sakura); border-color: var(--touhou-sakura); }
+.fun-btn-mobile.active { background: var(--touhou-red); color: #fff; border-color: var(--touhou-red); box-shadow: 0 0 15px var(--touhou-red); }
+
+/* --- SKIP LINK (accessibility) --- */
+.skip-link {
+    position: fixed;
+    top: -100px;
+    left: 16px;
+    background: var(--touhou-red);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 0 0 12px 12px;
+    font-weight: 800;
+    font-size: 0.85rem;
+    text-decoration: none;
+    z-index: 10000;
+    transition: top 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.skip-link:focus {
+    top: 0;
+    outline: 3px solid var(--touhou-sakura);
+    outline-offset: 2px;
+}
 
 /* --- SECTIONS & CARDS --- */
 section { 

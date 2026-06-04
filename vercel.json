@@ -12,6 +12,7 @@
     { "source": "/sub/trojan", "destination": "/sub_trojan.txt" },
     { "source": "/sub/ss", "destination": "/sub_ss.txt" },
     { "source": "/sub/hy2", "destination": "/sub_hy2.txt" },
+    { "source": "/manifest.json", "destination": "/manifest.json" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
