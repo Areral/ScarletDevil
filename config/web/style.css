@@ -330,6 +330,75 @@ section:last-of-type { border-bottom: none; }
 }
 .step-item code { background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: var(--cyber-blue); border: 1px solid var(--border); font-family: 'JetBrains Mono', monospace;}
 
+/* --- GUIDE TIP, TROUBLESHOOTING & CONFIG BLOCKS --- */
+.guide-tip {
+    margin-top: 22px;
+    background: rgba(16, 185, 129, 0.06);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-left: 4px solid var(--cyber-green);
+    border-radius: 0 12px 12px 0;
+    padding: 14px 16px;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+}
+.guide-tip b, .guide-tip strong { color: var(--cyber-green); }
+.guide-tip i { color: var(--cyber-green); }
+
+.guide-troubleshoot {
+    margin-top: 18px;
+    background: rgba(250, 204, 21, 0.06);
+    border: 1px solid rgba(250, 204, 21, 0.25);
+    border-left: 4px solid #facc15;
+    border-radius: 0 12px 12px 0;
+    padding: 14px 16px;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+}
+.guide-troubleshoot b, .guide-troubleshoot strong { color: #facc15; }
+.guide-troubleshoot i { color: #facc15; }
+.guide-troubleshoot ul { padding-left: 18px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.guide-troubleshoot li { color: var(--text-dim); font-size: 0.88rem; }
+.guide-troubleshoot li code { background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 5px; font-size: 0.75rem; color: var(--cyber-blue); border: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; }
+.guide-troubleshoot p { margin-bottom: 10px; }
+.guide-troubleshoot p:last-child { margin-bottom: 0; }
+
+.guide-config {
+    margin-top: 22px;
+    background: #050203;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    position: relative;
+}
+.guide-config-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--touhou-sakura);
+    margin-bottom: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.guide-config pre {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--cyber-green);
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.7;
+    margin: 0;
+}
+
 /* --- SUB CARDS --- */
 .sub-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .sub-card {
