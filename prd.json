@@ -131,7 +131,7 @@
         "`python -c \"import core.validator\"` runs without error"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "AUDIT.md §5.1.3 — keeps the Nightbird (BS) class from collapsing to zero."
     },
     {

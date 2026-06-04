@@ -287,3 +287,36 @@ Started: Thu Jun  4 04:19:02 RTZ 2026
   - For CI: `actions/setup-python@v5` with `cache: 'pip'` works alongside
     `requirements-dev.txt` — pip installs both files in sequence.
 ---
+
+## Thu Jun  4 - US-009 (Cache whitelist lists and log list age)
+- Added whitelist caching with fallback so the BS/Nightbird class survives a
+  temporary outage of upstream whitelist sources (AUDIT §5.1.3).
+- `core/validator.py`:
+  - Cache dir `data/whitelist_cache/` (gitignored via `data/`), with
+    `domains.txt` and `cidr.txt` holding the last successfully fetched lines.
+  - `_parse_lines(text)`: extracts lowercased non-comment lines (was inline
+    twice, now shared).
+  - `_save_cache(path, lines)` / `_load_cache(path)`: write/read cache files,
+    tolerant of IO errors (warn + continue).
+  - `_cache_age_str(path)`: returns mtime-based age (e.g. "3.2ч") for "list age"
+    logging.
+  - `_resolve_with_cache(fetched, cache_path, label)`: if fetch produced lines →
+    save to cache; if empty → load cache (warn with age) or warn empty+no-cache.
+  - `load_lists` now logs per-category source success counts (e.g. "домены 1/2"),
+    routes both domain and CIDR results through `_resolve_with_cache`, and the
+    final empty-bases warning notes "(источники И кэш)".
+- **Checks:** `python -m py_compile main.py merge.py parse_only.py core/*.py` OK.
+  Cache save/load round-trip verified standalone (lowercasing, comment skip,
+  age computation). Full `import core.validator` fails LOCALLY only per the
+  pydantic 1.x/2.x caveat; passes in CI (3.11/3.12). ruff not installed locally.
+- **Learnings for future iterations:**
+  - Whitelist cache lives in `data/whitelist_cache/` — same gitignored `data/`
+    dir as the pool (US-006) and Go IPC. For CI persistence across runs it needs
+    an `actions/cache` or artifact step, like pool.json — the Python code is
+    transport-agnostic.
+  - Domains and CIDR lists fall back INDEPENDENTLY: if domain sources are up but
+    CIDR sources are down, only CIDR falls back to cache. This is more resilient
+    than an all-or-nothing fallback.
+  - `os.path.getmtime` gives a cheap "list age" without storing a timestamp
+    inside the cache file.
+---
