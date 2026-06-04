@@ -135,8 +135,8 @@
         "`python -m py_compile merge.py` — без ошибок"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": "Текущий отчёт содержит базовую статистику. Нужны детали для оперативного выявления проблем с проверкой."
+      "passes": true,
+      "notes": "✅ 2026-06-05: send_telegram_report() расширен. Добавлены: overall survival rate (unique_alive/parsed) с ⚠️-алертом при <0.5%; лучший/худший дрон по survival (drone_survival агрегируется из per-drone alive/parsed); топ-3 страны (из country_stats); топ-3 источника по yield (top_sources из ranked yields); разбивка причин отказов (failure_reasons агрегирует l4_failure_reasons + l7_stats, исключая total/survived). HTML-разметка Telegram (b/code/эмодзи). py_compile OK."
     }
   ],
   "implementationOrder": [

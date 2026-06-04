@@ -236,3 +236,40 @@ Started:  4 июн 2026 г. 23:08:39
 - **fa-sparkles vs fa-wand-magic-sparkles:** в hero onboard-bubble используется fa-wand-magic-sparkles,
   в fun-panel stardust — fa-sparkles. Не путать.
 ---
+
+## 2026-06-05 - US-C07: Добавление мониторинга качества проверки в Telegram-отчёт
+
+### Что сделано
+
+1. **Расширен send_telegram_report() в merge.py:**
+   - Overall survival rate: `unique_alive / parsed * 100`, с ⚠️-алертом при <0.5%
+   - Лучший/худший дрон по survival rate (max/min из drone_survival)
+   - Топ-3 страны по количеству узлов (из country_stats)
+   - Топ-3 источника по yield (из top_sources)
+   - Разбивка причин отказов (top-5 из failure_reasons)
+   - HTML-разметка Telegram: <b>, <code>, эмодзи, разделители
+
+2. **Новые поля агрегации в main() (merge.py):**
+   - `drone_survival`: per-drone alive/parsed % (из stat-файлов)
+   - `failure_reasons`: агрегирует l4_failure_reasons + l7_stats со всех дронов,
+     исключая ключи total/survived и не-int значения (вложенные объекты)
+   - `top_sources`: заполняется из существующего ranked yield-списка (top-5)
+
+### Изменённые файлы
+
+- merge.py — stats dict (+3 поля), цикл агрегации stat-файлов, yield-ranking, send_telegram_report()
+- prd.json — US-C07 passes: true
+
+### Learnings for future iterations:
+- **stats-файлы дрона содержат и L4, и L7 failure данные:** l4_failure_reasons (плоский dict),
+  l7_stats (dict с total/survived + категории отказов). При агрегации причин отказов важно
+  исключать total/survived (это счётчики, не причины) и не-int значения (l7_stats может
+  содержать вложенные объекты).
+- **survival rate vs L4 dropped:** В отчёте уже был l4_dropped, но не было итогового survival %.
+  Overall survival = unique_alive/parsed (после дедупликации), per-drone = alive/parsed (до дедупа).
+  Разные знаменатели — overall ниже из-за межшардовых дубликатов.
+- **top_sources переиспользует ranked yield:** US-C03 уже считал yield-ранкинг для логов.
+  US-C07 просто захватывает top-5 в stats для Telegram — без дублирования вычислений.
+- **Только merge.py изменён:** US-C07 чисто на стороне отчётности, не трогает checker/Go/HTML.
+  Регенерация index.html не требовалась.
+---
