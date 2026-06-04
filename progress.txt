@@ -122,3 +122,38 @@ Started: Thu Jun  4 04:19:02 RTZ 2026
     together.
 ---
 
+## Thu Jun  4 - US-005 (GeoIP efficiency: dedup hosts and /24 country cache)
+- Deduplicated hosts before DNS resolution and added /24 subnet country cache
+  to reduce redundant ip-api lookups (AUDIT §2.3).
+- `core/engine.py`:
+  - Added `BatchEngine._geo_cache_key(ip)` static method: returns `/24` network
+    string for IPv4 (e.g. `1.2.3.0/24`), exact IP for IPv6. Neighbouring IPs in
+    the same /24 almost always share a country, so one ip-api lookup covers the
+    whole subnet.
+  - Rewrote `Inspector._resolve_geo`: builds a `host -> [nodes]` map first,
+    resolves only unique hostnames via DNS, then maps IPs back to all nodes.
+    Previously called `gethostbyname` for every node including duplicates.
+  - GeoIP fetch list is now deduplicated by /24 cache key (not exact IP) —
+    after the first IP in a /24 is looked up, subsequent IPs in the same /24
+    hit the cache and skip ip-api entirely.
+  - Cache store uses `_geo_cache_key(ip_key)` so all IPs in the same /24
+    benefit from one lookup.
+  - Improved logging: shows `nodes -> unique_hosts`, IP count, cache hits,
+    and number of actual ip-api fetches — provably quantifies the reduction.
+- **Checks:** `python -m py_compile main.py merge.py parse_only.py core/*.py`
+  OK. `import core.util` OK. Unit-tested `_geo_cache_key` logic (same-/24
+  sharing, cross-/24 isolation, IPv6 exact, garbage fallback). Full
+  `import core.engine` fails locally per documented pydantic 1.x/2.x caveat;
+  will pass in CI (3.11/3.12).
+- **Learnings for future iterations:**
+  - `dict.setdefault(key, default)` is the clean Python idiom for building a
+    `host -> [nodes]` multi-map in one pass.
+  - `ipaddress.IPv4Network(f"{addr}/24", strict=False)` is the correct way to
+    get the /24 network from an IPv4 address — `strict=False` allows any host
+    bits. `str(net)` returns `"x.y.z.0/24"`.
+  - The `_GEO_CACHE` is a class-level `Dict[str, str]` on `BatchEngine`,
+    shared across all `Inspector` instances within a process. The /24 key
+    strategy means once ANY drone resolves one IP in a /24, all subsequent
+    nodes in that /24 (even across different batches) reuse the result.
+---
+

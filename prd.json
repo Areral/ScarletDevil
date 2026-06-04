@@ -73,7 +73,7 @@
         "`python -c \"import core.engine\"` runs without error"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "AUDIT.md §2.3"
     },
     {
