@@ -117,7 +117,7 @@
         "All new code passes `python -m py_compile`"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "AUDIT.md §3.1, §3.2"
     },
     {

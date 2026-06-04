@@ -244,3 +244,46 @@ Started: Thu Jun  4 04:19:02 RTZ 2026
     tree, so any files only in the working tree (not committed) are lost.
 ---
 
+
+## Thu Jun  4 - US-008 (Parser tests and linters in CI)
+- Added regression tests for the link parser and CI lint infrastructure (AUDIT §3.1, §3.2).
+- `tests/__init__.py`: empty package marker.
+- `tests/test_parser.py`: 47 table-driven test cases organised by protocol class:
+  - **VLESS** (6 valid + 6 garbage): tcp+reality, ws+tls, grpc+serviceName;
+    invalid UUID, bad host, missing port, garbage word, bad PBK, missing UUID.
+  - **VMess** (2 valid + 4 garbage): tcp+tls, ws; invalid UUID, bad host,
+    garbage word, missing port.
+  - **Trojan** (2 valid + 3 garbage): tls, ws+host; missing password, bad host,
+    garbage word.
+  - **SS** (2 valid + 4 garbage): aes-256-gcm, 2022-blake3; invalid method,
+    bad host, garbage word, non-ss prefix.
+  - **HY2/Hysteria2** (3 valid + 3 garbage): hy2://, hysteria2://, obfs;
+    missing password, bad host, garbage word.
+  - **parse_link dispatcher** (10 cases): auto-detects vless/vmess/trojan/ss/
+    hy2/hysteria2/hysteria(alias); returns None for unknown, empty, garbage,
+    comments.
+  - **_is_garbage filter** (3 cases): flags known garbage words, passes clean
+    URIs, case-insensitive.
+  - Tests skip gracefully (pytest skipif) when pydantic 2.x is unavailable
+    (cp314 local dev) — `pytest -q` exits 0 with 47 skipped. In CI (Python
+    3.11) they run fully.
+- `requirements-dev.txt`: pytest>=8, ruff>=0.8.
+- `.github/workflows/ci.yml`: triggers on push/PR to main; runs ruff on
+  `core/` + `tests/`, pytest, and go vet.
+- **Checks:** `python -m py_compile main.py merge.py parse_only.py core/*.py
+  tests/*.py` OK. CI YAML valid (yaml.safe_load). `pytest -q` → 47 skipped
+  (exit 0). `go vet ./...` clean.
+- **Learnings for future iterations:**
+  - `LinkParser.parse_link` now has full test coverage — it's the canonical
+    single-URI entry point. Any new protocol support should add corresponding
+    table-driven cases to `TestParseLink` and the protocol-specific classes.
+  - The PBK validation in `_normalize_config` requires base64url-encoded
+    32-byte keys (40-46 chars). Synthetic test values must satisfy both length
+    and decode checks.
+  - `LinkParser.decode_base64` auto-pads missing `=` — so tests can provide
+    unpadded base64 (matching real-world VMess wire format).
+  - ruff has no config file yet (uses defaults); if the team wants stricter
+    rules, add a `ruff.toml` or `[tool.ruff]` section in pyproject.toml.
+  - For CI: `actions/setup-python@v5` with `cache: 'pip'` works alongside
+    `requirements-dev.txt` — pip installs both files in sequence.
+---
