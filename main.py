@@ -125,7 +125,8 @@ async def main() -> None:
         logger.info(f"  Dead sources     {len(dead_sources):>8,}")
         logger.info(f"  ⚡ Top speed      {top_speed:>8.1f}  Mbps")
         logger.info(f"  📊 Avg/Med/P90    {avg_speed:>6.1f} / {median_speed:>6.1f} / {speed_p90:>6.1f}  Mbps")
-        logger.info(f"  🌍 Top countries  {len(country_stats)}  ({', '.join(f'{c['code']}:{c['count']}' for c in country_stats[:5])})")
+        top_countries_str = ', '.join(f"{c['code']}:{c['count']}" for c in country_stats[:5])
+        logger.info(f"  🌍 Top countries  {len(country_stats)}  ({top_countries_str})")
         GHA.endgroup()
 
         GHA.group("⑤ EXPORT — Writing Subscription Files")
