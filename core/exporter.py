@@ -241,6 +241,9 @@ class Exporter:
         dead_sources: Optional[List[str]] = None,
         duration: float = 0.0,
         l4_dropped: int = 0,
+        l4_failure_reasons: Optional[Dict[str, int]] = None,
+        l4_retry_attempts: int = 0,
+        l4_retry_recovered: int = 0,
     ):
         logger.info(
             f"Exporter: Старт сохранения {len(nodes)} узлов в физические файлы "
@@ -290,6 +293,9 @@ class Exporter:
             "top_speed": top_speed,
             "duration": duration,
             "l4_dropped": l4_dropped,
+            "l4_failure_reasons": l4_failure_reasons or {},
+            "l4_retry_attempts": l4_retry_attempts,
+            "l4_retry_recovered": l4_retry_recovered,
             "dead_sources": list(dead_sources) if dead_sources else [],
         }
 

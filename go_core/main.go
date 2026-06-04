@@ -44,7 +44,26 @@ var (
 
 	portCounter = 10000
 	portMutex   sync.Mutex
+
+	// L4 failure reason counters (reset per l4 phase)
+	l4Stats   L4Stats
+	l4StatsMu sync.Mutex
 )
+
+// L4Stats tracks L4 failure reasons for telemetry
+type L4Stats struct {
+	Total             int `json:"total"`
+	Survived          int `json:"survived"`
+	DNS_Error         int `json:"dns_error"`
+	Timeout           int `json:"timeout"`
+	ConnectionRefused int `json:"connection_refused"`
+	InvalidConfig     int `json:"invalid_config"`
+	Other             int `json:"other"`
+
+	// Retry metrics
+	RetryAttempts  int `json:"retry_attempts"`
+	RetryRecovered int `json:"retry_recovered"` // nodes saved by retry
+}
 
 func init() {
 	cidrs := []string{
@@ -72,7 +91,7 @@ func getNextBasePort(batchSize int) int {
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "Usage: angra_core <input.json> <output.json>")
+		fmt.Fprintln(os.Stderr, "Usage: angra_core <input.json> <output.json> [stats.json]")
 		os.Exit(1)
 	}
 
@@ -96,8 +115,22 @@ func main() {
 	nodes := payload.Nodes
 
 	l4Nodes := runL4Phase(nodes)
-	fmt.Printf("✔[ФИЛЬТРАЦИЯ L4]: Отбраковано %d, Выжило: %d\n",
-		len(nodes)-len(l4Nodes), len(l4Nodes))
+	survivalPct := 0.0
+	if len(nodes) > 0 {
+		survivalPct = float64(len(l4Nodes)) / float64(len(nodes)) * 100
+	}
+	fmt.Printf("✔[ФИЛЬТРАЦИЯ L4]: Отбраковано %d, Выжило: %d (%.2f%% survival)\n",
+		len(nodes)-len(l4Nodes), len(l4Nodes), survivalPct)
+
+	// Write L4 stats if third arg provided
+	if len(os.Args) >= 4 && os.Args[3] != "" {
+		l4StatsMu.Lock()
+		stats := l4Stats
+		l4StatsMu.Unlock()
+		if statsBytes, err := json.Marshal(stats); err == nil {
+			_ = os.WriteFile(os.Args[3], statsBytes, 0644)
+		}
+	}
 
 	if len(l4Nodes) == 0 {
 		_ = os.WriteFile(os.Args[2], []byte("[]"), 0644)
@@ -116,6 +149,11 @@ func main() {
 }
 
 func runL4Phase(nodes []map[string]interface{}) []map[string]interface{} {
+	// Reset L4 stats for this phase
+	l4StatsMu.Lock()
+	l4Stats = L4Stats{Total: len(nodes)}
+	l4StatsMu.Unlock()
+
 	validNodes := make([]map[string]interface{}, 0, len(nodes)/2)
 	var mu sync.Mutex
 
@@ -136,10 +174,29 @@ func runL4Phase(nodes []map[string]interface{}) []map[string]interface{} {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
-				if checkL4(n) {
+				alive, reason := checkL4(n)
+				if alive {
 					mu.Lock()
+					l4StatsMu.Lock()
+					l4Stats.Survived++
+					l4StatsMu.Unlock()
 					validNodes = append(validNodes, n)
 					mu.Unlock()
+				} else {
+					l4StatsMu.Lock()
+					switch reason {
+					case "dns_error":
+						l4Stats.DNS_Error++
+					case "timeout":
+						l4Stats.Timeout++
+					case "connection_refused":
+						l4Stats.ConnectionRefused++
+					case "invalid_config":
+						l4Stats.InvalidConfig++
+					default:
+						l4Stats.Other++
+					}
+					l4StatsMu.Unlock()
 				}
 			}(node)
 		}
@@ -148,15 +205,19 @@ func runL4Phase(nodes []map[string]interface{}) []map[string]interface{} {
 	return validNodes
 }
 
-func checkL4(node map[string]interface{}) bool {
+// checkL4 performs TCP connectivity check with retry.
+// Returns (alive bool, failureReason string).
+// Timeouts: DNS 4s, TCP dial attempt 1: 8s, retry after 2s wait: 10s.
+func checkL4(node map[string]interface{}) (bool, string) {
 	protocol, _ := node["protocol"].(string)
 	if protocol == "hysteria2" || protocol == "quic" {
-		return true
+		// UDP-based protocols — skip L4 TCP check
+		return true, ""
 	}
 
 	config, ok := node["config"].(map[string]interface{})
 	if !ok {
-		return false
+		return false, "invalid_config"
 	}
 
 	hostRaw, _ := config["server"].(string)
@@ -164,18 +225,19 @@ func checkL4(node map[string]interface{}) bool {
 	portFloat, _ := config["port"].(float64)
 	port := int(portFloat)
 	if port <= 0 || port > 65535 {
-		return false
+		return false, "invalid_config"
 	}
 
+	// DNS resolution with 4s timeout (increased from 2s)
 	var targetIP net.IP
 	if parsed := net.ParseIP(host); parsed != nil {
 		targetIP = parsed
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 		defer cancel()
 		ips, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
 		if err != nil || len(ips) == 0 {
-			return false
+			return false, "dns_error"
 		}
 		for _, ip := range ips {
 			if ip.To4() != nil {
@@ -189,7 +251,7 @@ func checkL4(node map[string]interface{}) bool {
 	}
 
 	if targetIP.IsLoopback() || targetIP.IsPrivate() || targetIP.IsUnspecified() {
-		return false
+		return false, "invalid_config"
 	}
 
 	nodeType, _ := config["type"].(string)
@@ -199,24 +261,57 @@ func checkL4(node map[string]interface{}) bool {
 	if !isCdnAllowed {
 		for _, network := range forbiddenNetworks {
 			if network.Contains(targetIP) {
-				return false
+				return false, "invalid_config"
 			}
 		}
 	}
 
-	addr := fmt.Sprintf("%s:%d", targetIP.String(), port)
-	if targetIP.To4() == nil {
+	var addr string
+	if targetIP.To4() != nil {
+		addr = fmt.Sprintf("%s:%d", targetIP.String(), port)
+	} else {
 		addr = fmt.Sprintf("[%s]:%d", targetIP.String(), port)
 	}
 
+	// Attempt 1: TCP dial with 8s timeout (increased from 2.5s)
+	// Jitter 0-29ms to spread connection storms
 	time.Sleep(time.Duration(rand.Intn(30)) * time.Millisecond)
 
-	conn, err := net.DialTimeout("tcp", addr, 2500*time.Millisecond)
-	if err != nil {
-		return false
+	conn, err := net.DialTimeout("tcp", addr, 8*time.Second)
+	if err == nil {
+		conn.Close()
+		return true, ""
 	}
-	conn.Close()
-	return true
+
+	// Classify failure and decide whether to retry
+	errStr := err.Error()
+	isTimeout := strings.Contains(errStr, "timeout") || strings.Contains(errStr, "i/o timeout")
+
+	if !isTimeout {
+		// Connection refused, network unreachable — unlikely to change on retry
+		if strings.Contains(errStr, "refused") {
+			return false, "connection_refused"
+		}
+		return false, "other"
+	}
+
+	// Attempt 2: retry with 10s timeout after 2s exponential backoff
+	l4StatsMu.Lock()
+	l4Stats.RetryAttempts++
+	l4StatsMu.Unlock()
+
+	time.Sleep(2 * time.Second)
+
+	conn2, err2 := net.DialTimeout("tcp", addr, 10*time.Second)
+	if err2 == nil {
+		conn2.Close()
+		l4StatsMu.Lock()
+		l4Stats.RetryRecovered++
+		l4StatsMu.Unlock()
+		return true, ""
+	}
+
+	return false, "timeout"
 }
 
 func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {

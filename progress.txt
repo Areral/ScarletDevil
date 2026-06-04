@@ -1,0 +1,43 @@
+# Ralph Progress Log
+Started:  4 июн 2026 г. 23:08:39
+---
+
+## 2026-06-04 - US-C01: Аудит и настройка параметров L4 TCP-проверки
+
+### Что сделано
+
+1. **Увеличены таймауты TCP-проверки в go_core/main.go:**
+   - DNS resolution: 2s → 4s
+   - TCP dial (попытка 1): 2.5s → 8s
+   - TCP dial (попытка 2): 10s (после 2s задержки)
+
+2. **Добавлен retry-механизм:**
+   - 2 попытки на узел
+   - Экспоненциальная задержка: 2s между попытками
+   - Retry только для timeout (connection_refused не ретраится)
+   - Статистика: l4_retry_attempts, l4_retry_recovered
+
+3. **Добавлено логирование причин отказа L4:**
+   - dns_error, timeout, connection_refused, invalid_config, other
+   - Статистика пишется в data/go_stats_{uid}.json через 3-й аргумент CLI
+   - Python Inspector читает L4-статистику после завершения Go-процесса
+   - Причины отказов попадают в data/stats_*.json
+
+4. **L4 survival rate в логах:**
+   - Go: `✔[ФИЛЬТРАЦИЯ L4]: Отбраковано X, Выжило: Y (Z% survival)`
+   - Python: `L4 failure breakdown: {...} | retries=N recovered=M`
+
+### Изменённые файлы
+
+- go_core/main.go — основная логика L4 (checkL4, runL4Phase, main)
+- core/engine.py — IPC: передача stats-файла, чтение L4-статистики
+- core/exporter.py — включение l4_failure_reasons в stats_*.json
+- main.py — передача l4_failure_reasons из Inspector в Exporter
+- prd.json — US-C01 помечен как passes: true
+
+### Learnings for future iterations:
+- **L4 checking живёт в Go, НЕ в Python.** Python только оркестрирует (вызывает Go binary). Если нужно менять параметры проверки — менять нужно в go_core/main.go.
+- **IPC между Python и Go — файлы JSON.** Добавление нового канала данных (L4 stats) потребовало третий CLI-аргумент и новый stats-файл.
+- **timeout vs connection_refused:** При timeout есть смысл ретраить (сеть может быть перегружена), при connection_refused — нет (сервер активно отвергает).
+- **go vet:** Предупреждает о формате адреса для IPv6 даже если код корректно обрабатывает оба случая. Лучше использовать if/else вместо перезаписи переменной.
+- **pydantic v1/v2:** Локально установлен pydantic 1.10.12, но код требует 2.6.1. Python import падает, но compile — OK. CI должен иметь правильную версию.

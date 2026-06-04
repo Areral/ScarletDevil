@@ -1,0 +1,170 @@
+{
+  "project": "Scarlet Devil Network — Checker Remediation & Site Polish",
+  "branchName": "ralph/checker-remediation",
+  "dependsOn": "ralph/website-overhaul (all US-W01..US-W10 complete)",
+  "description": "Фаза 2: улучшение качества проверки узлов (анализ логов показал 0.94% survival rate при дисбалансе дронов до 45x), исправление UI-багов, удаление RU-узлов, реорганизация секций сайта. Стек: Python (merge.py, core/engine.py, core/parser.py, core/validator.py) + Go (go_core/main.go) + статический HTML/CSS/JS (config/web/*) + Vercel (vercel.json) + GitHub Actions (.github/workflows/update.yml).",
+  "analysisSummary": {
+    "date": "2026-06-04",
+    "dronePerformance": {
+      "drone0": "parsed=17,841 alive=536 (3.0%) speed=469.6 Mbps",
+      "drone1": "parsed=17,841 alive=96 (0.54%) speed=195.9 Mbps",
+      "drone2": "parsed=17,841 alive=30 (0.17%) speed=61.9 Mbps",
+      "drone3": "parsed=17,841 alive=12 (0.07%) speed=78.3 Mbps"
+    },
+    "keyIssues": [
+      "45x дисбаланс между лучшим и худшим дроном (536 vs 12 alive)",
+      "L4 фильтр убивает ~99% узлов — возможно слишком агрессивный таймаут",
+      "L7 sing-box инспекция убивает ещё ~99% выживших — параметры валидации требуют аудита",
+      "Скоростной тест только для топ-5 узлов — недостаточная выборка",
+      "GitHub Actions раннеры в Azure US — география не совпадает с целевыми регионами (РФ/СНГ)",
+      "Секции сайта были в неправильном порядке, RU-узлы отображались, FX-контрол не убран"
+    ]
+  },
+  "userStories": [
+    {
+      "id": "US-C01",
+      "title": "Аудит и настройка параметров L4 TCP-проверки",
+      "description": "Как оператор, я хочу чтобы L4 проверка не отбрасывала потенциально рабочие узлы из-за слишком агрессивных таймаутов, чтобы повысить процент выживаемости после первого этапа фильтрации.",
+      "acceptanceCriteria": [
+        "Проанализированы параметры TCP-коннекта в core/engine.py: таймаут, количество попыток, размер пула соединений",
+        "Таймаут TCP-коннекта увеличен с текущего значения до 8-12 секунд (если было меньше)",
+        "Добавлен retry-механизм: 2 попытки на узел с экспоненциальной задержкой",
+        "Добавлено логирование причины отказа (timeout / connection_refused / dns_error) в stats_*.json",
+        "L4 survival rate отслеживается в логах для каждого дрона",
+        "`python -m py_compile core/engine.py core/models.py core/validator.py` — без ошибок",
+        "`cd go_core && go build -o /dev/null ./...` — без ошибок"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "✅ 2026-06-04: L4 timeout increased 2.5s→8s, DNS timeout 2s→4s, retry 2× with exponential backoff (2s wait, 10s retry). Failure reason tracking added (dns_error/timeout/connection_refused/invalid_config/other). L4 survival % logged. Stats written via go_stats_{uid}.json IPC channel."
+    },
+    {
+      "id": "US-C02",
+      "title": "Аудит и настройка параметров L7 sing-box валидации",
+      "description": "Как оператор, я хочу чтобы L7 проверка через sing-box корректно определяла рабочие узлы, не отбрасывая узлы с медленным but валидным ответом, и логировала конкретную причину отказа каждого узла.",
+      "acceptanceCriteria": [
+        "Проанализированы параметры запуска sing-box в core/engine.py (BatchEngine) — таймаут, URL для проверки, размер батча",
+        "URL для HTTP-теста изменён на более надёжный эндпоинт (например, http://cp.cloudflare.com/ или http://www.gstatic.com/generate_204)",
+        "Таймаут L7 HTTP-запроса увеличен до 15-20 секунд (если было меньше)",
+        "Размер батча уменьшен до 50 узлов для более точного контроля",
+        "Добавлен детальный failure reason в вывод логов (timeout / tls_error / http_error / protocol_mismatch)",
+        "`python -m py_compile core/engine.py core/validator.py` — без ошибок",
+        "`cd go_core && go build -o /dev/null ./... && go vet ./...` — без ошибок"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Анализ: L7 батчи по 100 узлов, большинство дают 0 survivors. Нужно понять причину — неправильный тестовый URL, слишком короткий таймаут, или узлы действительно не проксируют трафик."
+    },
+    {
+      "id": "US-C03",
+      "title": "Балансировка шардов и курирование источников",
+      "description": "Как оператор, я хочу чтобы источники подписок были равномерно распределены между дронами, а мёртвые/нестабильные источники автоматически исключались из выборки после N последовательных провалов.",
+      "acceptanceCriteria": [
+        "Проанализирован SHARD_INDEX / SHARD_COUNT механизм в main.py: как источники распределяются по дронам",
+        "Добавлен health-track для источников в core/parser.py или core/settings.py — счётчик последовательных провалов",
+        "Источник с >5 последовательными провалами исключается на 24 часа (с записью в dead_sources лог)",
+        "Источники с высоким yield (>5% alive) получают приоритет при распределении по шардам",
+        "Добавлен `source_yield` в telemetry (stats_*.json) для мониторинга",
+        "`python -m py_compile main.py core/parser.py core/settings.py` — без ошибок"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Drone 0: 536 alive, Drone 3: 12 alive. Разница в 45x указывает на неравномерное распределение качественных источников. Нужен health-tracking источников."
+    },
+    {
+      "id": "US-C04",
+      "title": "Расширенный скоростной тест и гео-статистика",
+      "description": "Как оператор, я хочу чтобы скоростной тест охватывал больше узлов (не только топ-5) и генерировал агрегированную статистику по странам для отображения на дашборде.",
+      "acceptanceCriteria": [
+        "Скоростной тест расширен с топ-5 до топ-20 узлов (настраиваемый параметр в config/settings.yaml)",
+        "В stats_*.json добавлены поля: avg_speed, median_speed, speed_percentile_90",
+        "GeoIP-разрешение (country_stats) работает корректно и заполняется для всех выживших узлов",
+        "Функция _extract_country_stats в merge.py извлекает коды стран из URL-фрагментов и/или из GeoIP-поля в stats_*.json",
+        "Статистика по странам отображается на дашборде (секция stats) с флагами и процентным распределением",
+        "`python -m py_compile merge.py core/exporter.py core/settings.py` — без ошибок"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Сейчас speed test только для топ-5. Country stats извлекаются из URL-фрагментов (#XX-name), но не все узлы имеют такой формат. Нужно использовать GeoIP-данные из дронов."
+    },
+    {
+      "id": "US-C05",
+      "title": "Исправление UI-багов и полировка сайта",
+      "description": "Как пользователь, я хочу чтобы сайт работал без визуальных багов: кнопки были правильно выровнены, иконки отображались, статистика сети была информативной, а навигация была интуитивной.",
+      "acceptanceCriteria": [
+        "Кнопки «Получить доступ» и «Быстрая настройка» в hero-секции выровнены горизонтально на десктопе и вертикально на мобильных",
+        "Кнопка «Звёздная пыль» в fun-panel имеет иконку fa-sparkles и работает при клике",
+        "Переключатель интенсивности эффектов (FX control) полностью удалён — используется только Normal режим",
+        "Все упоминания RU-узлов (Remilia, RU-verified, sub_ru) удалены из HTML, CSS, JS, merge.py и vercel.json",
+        "Секция «Сообщество и Контакты» находится последней перед legal disclaimer",
+        "Секция «Часто задаваемые вопросы» (FAQ) находится непосредственно перед «Сообщество и Контакты»",
+        "Секция «Статистика сети» содержит рабочие чарты: распределение по протоколам, по классам (БС/ЧС), топ-10 стран, сводка по скорости",
+        "Все чарты в секции статистики заполняются из data-атрибутов при загрузке страницы (buildStats() работает)",
+        "index.html сгенерирован из актуальных source-файлов (template.html + style.css + main.js)",
+        "Валидация: открыть index.html в браузере → проверить hero-кнопки, навигацию, FAQ, контакты, статистику"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Часть багов уже исправлена в этой сессии: удалён FX-control, удалены RU-узлы, переставлены секции (FAQ → Contacts), обновлён index.html. Нужна финальная валидация в браузере."
+    },
+    {
+      "id": "US-C06",
+      "title": "Улучшение стилизации hero-секции и кнопок",
+      "description": "Как пользователь, я хочу чтобы hero-секция выглядела эффектно с правильно выровненными кнопками, а wizard быстрой настройки был заметен для новых пользователей.",
+      "acceptanceCriteria": [
+        "CSS-класс .hero-actions использует flexbox с правильным gap и выравниванием",
+        "На десктопе (>768px) кнопки в hero располагаются горизонтально: «Получить доступ» (primary) + «Быстрая настройка» (secondary)",
+        "На мобильных (<768px) кнопки располагаются вертикально, полная ширина",
+        "Wizard-подсказка (.onboard-bubble) показывается только при первом визите (localStorage sd_visited)",
+        "Кнопка wizard имеет анимированную иконку fa-hat-wizard",
+        "Визуальная проверка: открыть index.html на 375×812 (iPhone), 1366×768 (Desktop)"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "В template.html уже есть .hero-actions div с двумя кнопками. Нужно проверить CSS-стили в style.css для .hero-actions."
+    },
+    {
+      "id": "US-C07",
+      "title": "Добавление мониторинга качества проверки в Telegram-отчёт",
+      "description": "Как оператор, я хочу получать в Telegram-отчёте расширенную информацию о качестве проверки: процент выживаемости по каждому дрону, топ-5 источников по yield, распределение причин отказов.",
+      "acceptanceCriteria": [
+        "Функция send_telegram_report() в merge.py расширена: добавлены поля survival_rate, top_sources, failure_reasons",
+        "Telegram-сообщение показывает: общий survival rate (%), лучший/худший дрон по survival, топ-3 страны по количеству узлов",
+        "Добавлен алерт если survival rate падает ниже 0.5% — сообщение помечается ⚠️",
+        "Формат сообщения использует HTML-разметку Telegram (жирный, код, эмодзи)",
+        "`python -m py_compile merge.py` — без ошибок"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Текущий отчёт содержит базовую статистику. Нужны детали для оперативного выявления проблем с проверкой."
+    }
+  ],
+  "implementationOrder": [
+    "US-C01 (L4 аудит) — сначала понять, почему 99% узлов убивается на TCP-коннекте",
+    "US-C02 (L7 аудит) — затем разобраться с sing-box валидацией",
+    "US-C03 (балансировка шардов) — исправить дисбаланс источников",
+    "US-C04 (скоростной тест + гео) — расширить покрытие тестами",
+    "US-C05 (UI баги) — параллельно или после, многие уже исправлены",
+    "US-C06 (hero стили) — полировка",
+    "US-C07 (Telegram мониторинг) — улучшение наблюдаемости"
+  ],
+  "qualityChecks": [
+    "python -m py_compile merge.py core/engine.py core/exporter.py core/parser.py core/validator.py core/settings.py",
+    "cd go_core && go build -o /dev/null ./... && go vet ./...",
+    "python -c \"import json; json.load(open('vercel.json'))\"",
+    "python -c \"import yaml; yaml.safe_load(open('config/settings.yaml'))\"",
+    "node --check config/web/main.js",
+    "Открыть index.html в браузере — проверить hero, секции, модалки, чарты статистики",
+    "Проверить на мобильном viewport (375×812 iPhone, 360×800 Android)",
+    "Прогнать полный цикл: python main.py (с фейковыми данными) → проверить stats_*.json → python merge.py → открыть index.html"
+  ],
+  "styleGuide": {
+    "colors": "Scarlet Devil палитра (--bg-void: #0a0306, --touhou-red: #e11d48, --touhou-purple: #946cf8, --touhou-sakura: #f472b6)",
+    "typography": "Manrope (основной) + JetBrains Mono (моноширинный, код, логи)",
+    "icons": "Font Awesome 6 Free (fa-solid предпочтительно)",
+    "effects": "Только Normal режим — без Minimal/Extreme переключателя. Все анимации отключаемые через fun-panel.",
+    "noExternalDeps": "Никаких npm/CDN кроме Font Awesome и Google Fonts. QR — самописный JS.",
+    "naming": "CSS: kebab-case, JS: camelCase, Python: snake_case, Go: camelCase",
+    "comments": "Русский для пользовательских текстов, английский для технических комментариев в коде"
+  }
+}

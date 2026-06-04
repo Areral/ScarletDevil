@@ -154,6 +154,9 @@ class BatchEngine:
 class Inspector:
     def __init__(self) -> None:
         self.l4_dropped = 0
+        self.l4_failure_reasons: Dict[str, int] = {}
+        self.l4_retry_attempts = 0
+        self.l4_retry_recovered = 0
 
     async def _resolve_geo(self, nodes: List[ProxyNode]) -> None:
         logger.info("  GeoIP: разрешение DNS...")
@@ -243,6 +246,7 @@ class Inspector:
         uid = uuid.uuid4().hex[:8]
         input_file = f"data/go_in_{uid}.json"
         output_file = f"data/go_out_{uid}.json"
+        stats_file = f"data/go_stats_{uid}.json"
 
         payload_nodes: List[dict] = []
         for n in nodes:
@@ -300,7 +304,7 @@ class Inspector:
                 logger.info("  Компиляция завершена.")
 
             proc = await asyncio.create_subprocess_exec(
-                f"./angra_core{ext}", f"../{input_file}", f"../{output_file}",
+                f"./angra_core{ext}", f"../{input_file}", f"../{output_file}", f"../{stats_file}",
                 cwd="go_core",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -333,7 +337,42 @@ class Inspector:
             if proc.returncode != 0:
                 stderr_text = b"".join(stderr_chunks).decode(errors="replace")
                 logger.error(f"  ANGRA-CORE exited {proc.returncode}: {stderr_text[:500]}")
+                # Try to read L4 stats even on failure
+                if os.path.exists(stats_file):
+                    try:
+                        with open(stats_file, "r", encoding="utf-8") as sf:
+                            l4s = json.load(sf)
+                        self.l4_failure_reasons = {
+                            k: v for k, v in l4s.items()
+                            if k not in ("total", "survived", "retry_attempts", "retry_recovered")
+                        }
+                        self.l4_retry_attempts = l4s.get("retry_attempts", 0)
+                        self.l4_retry_recovered = l4s.get("retry_recovered", 0)
+                        logger.info(
+                            f"  L4 failure breakdown: {self.l4_failure_reasons} | "
+                            f"retries={self.l4_retry_attempts} recovered={self.l4_retry_recovered}"
+                        )
+                    except Exception:
+                        pass
                 return []
+
+            # Read L4 failure stats
+            if os.path.exists(stats_file):
+                try:
+                    with open(stats_file, "r", encoding="utf-8") as sf:
+                        l4s = json.load(sf)
+                    self.l4_failure_reasons = {
+                        k: v for k, v in l4s.items()
+                        if k not in ("total", "survived", "retry_attempts", "retry_recovered")
+                    }
+                    self.l4_retry_attempts = l4s.get("retry_attempts", 0)
+                    self.l4_retry_recovered = l4s.get("retry_recovered", 0)
+                    logger.info(
+                        f"  L4 failure breakdown: {self.l4_failure_reasons} | "
+                        f"retries={self.l4_retry_attempts} recovered={self.l4_retry_recovered}"
+                    )
+                except Exception:
+                    pass
 
             with open(output_file, "r", encoding="utf-8") as f:
                 valid_nodes_data: list = json.load(f)
@@ -352,7 +391,7 @@ class Inspector:
             logger.exception(f"  Go integration failure: {exc}")
             return []
         finally:
-            for path in (input_file, output_file):
+            for path in (input_file, output_file, stats_file):
                 try:
                     if os.path.exists(path):
                         os.remove(path)
