@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +24,8 @@ import (
 type EngineSettings struct {
 	MaxLatency       int      `json:"max_latency"`
 	MinSpeed         float64  `json:"min_speed"`
+	SpeedAsFilter    bool     `json:"speed_as_filter"`
+	SpeedConcurrency int      `json:"speed_concurrency"`
 	ConnectivityUrls []string `json:"connectivity_urls"`
 	SpeedtestUrl     string   `json:"speedtest_url"`
 	ChampionTestUrl  string   `json:"champion_test_url"`
@@ -204,10 +207,7 @@ func checkL4(node map[string]interface{}) bool {
 		}
 	}
 
-	addr := fmt.Sprintf("%s:%d", targetIP.String(), port)
-	if targetIP.To4() == nil {
-		addr = fmt.Sprintf("[%s]:%d", targetIP.String(), port)
-	}
+	addr := net.JoinHostPort(targetIP.String(), strconv.Itoa(port))
 
 	time.Sleep(time.Duration(rand.Intn(30)) * time.Millisecond)
 
@@ -411,7 +411,20 @@ func processSingboxBatch(
 
 	var wgSpeed sync.WaitGroup
 	alive := make([]map[string]interface{}, 0, len(pingPassed))
-	semSpeed := make(chan struct{}, 40)
+
+	// Speed-test concurrency is configurable to lower contention for the
+	// runner's single uplink (40 parallel downloads understated speed and
+	// caused alive nodes to be dropped — see AUDIT §2.4). Default 12.
+	speedConcurrency := globalSettings.SpeedConcurrency
+	if speedConcurrency <= 0 {
+		speedConcurrency = 12
+	}
+	semSpeed := make(chan struct{}, speedConcurrency)
+
+	minSpeed := globalSettings.MinSpeed
+	if minSpeed <= 0 {
+		minSpeed = 1.0
+	}
 
 	for port, node := range pingPassed {
 		wgSpeed.Add(1)
@@ -420,12 +433,23 @@ func processSingboxBatch(
 			defer wgSpeed.Done()
 			defer func() { <-semSpeed }()
 			verifySSL := resolvePayloadSSL(n)
-			if speed, ok := testHTTPSpeed(p, verifySSL, isChampion); ok {
+			speed, ok := testHTTPSpeed(p, verifySSL, isChampion)
+			// Speed is always recorded for sorting/labels; a failed
+			// measurement records 0 without dropping the node.
+			if ok {
 				n["speed"] = speed
-				mu.Lock()
-				alive = append(alive, n)
-				mu.Unlock()
+			} else if _, exists := n["speed"]; !exists {
+				n["speed"] = 0.0
 			}
+			// Survival is gated on the L7 connectivity ping (already
+			// passed). min_speed only drops a node when speed_as_filter
+			// is explicitly enabled; otherwise it is a ranking signal.
+			if globalSettings.SpeedAsFilter && (!ok || speed < minSpeed) {
+				return
+			}
+			mu.Lock()
+			alive = append(alive, n)
+			mu.Unlock()
 		}(port, node)
 	}
 	wgSpeed.Wait()
@@ -522,12 +546,11 @@ func testHTTPPing(port int) (int, bool) {
 	return 0, false
 }
 
+// testHTTPSpeed measures throughput through the local SOCKS proxy. It returns
+// the measured speed in Mbps and whether the measurement succeeded. It does NOT
+// apply the min_speed threshold — that decision lives in the caller and is only
+// enforced when speed_as_filter is enabled (AUDIT §2.4).
 func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
-	minSpeed := globalSettings.MinSpeed
-	if minSpeed <= 0 {
-		minSpeed = 1.0
-	}
-
 	var (
 		timeout    time.Duration
 		targetURL  string
@@ -598,9 +621,6 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
 	speed := (float64(total) * 8.0) / (elapsed * 1_000_000.0)
 	if speed > 3000.0 {
 		speed = 3000.0
-	}
-	if speed < minSpeed {
-		return 0, false
 	}
 	return speed, true
 }

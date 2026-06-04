@@ -263,6 +263,8 @@ class Inspector:
             "settings": {
                 "max_latency": CONFIG.checking.get("max_latency", 5000),
                 "min_speed":   CONFIG.checking.get("min_speed", 1.0),
+                "speed_as_filter": CONFIG.checking.get("speed_as_filter", False),
+                "speed_concurrency": CONFIG.checking.get("speed_concurrency", 12),
                 "connectivity_urls": CONFIG.checking.get(
                     "connectivity_urls", ["http://cp.cloudflare.com/generate_204"]
                 ),

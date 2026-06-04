@@ -1,0 +1,45 @@
+# Ralph Progress Log
+Started: Thu Jun  4 04:19:02 RTZ 2026
+
+## Codebase Patterns
+- **Go settings contract (3 files in sync):** `EngineSettings` struct in
+  `go_core/main.go` <- payload built in `core/engine.py` `Inspector.process_all`
+  (the `"settings"` dict) <- values read from `core/settings.py CONFIG.checking`
+  which loads `config/settings.yaml`. To add a tunable for the Go core: add a JSON
+  field on the struct, add the key to the engine.py payload (`CONFIG.checking.get(...)`),
+  and document it under `checking:` in settings.yaml.
+- **Go build needs `go mod tidy` first:** `go_core/go.sum` may be absent; the build
+  fails with "missing go.sum entry" until `cd go_core && go mod tidy` is run (this is
+  what engine.py does at runtime on first compile). go.sum should be committed.
+- **`go vet` (Go 1.26) runs the hostport analyzer:** `fmt.Sprintf("%s:%d", host, port)`
+  passed to net.Dial is flagged. Use `net.JoinHostPort(host, strconv.Itoa(port))`.
+- **Local env caveat:** this machine runs Python 3.14 + pydantic 1.x; the repo pins
+  pydantic==2.6.1 (uses `field_validator`). `import core.*` fails locally because
+  pydantic-core 2.x has no cp314 wheel and source build needs Rust. `py_compile` is
+  the reliable local Python check; full imports/pytest validate in CI (3.11/3.12).
+- **L7 survival vs ranking:** a node survives the Go L7 phase if it passes the
+  connectivity ping (HTTP 204). Speed is measured and stored on every survivor for
+  sorting; it only filters when `speed_as_filter: true`.
+---
+
+## Thu Jun  4 - US-001 (Speed as ranking signal, not a hard filter)
+- Made speed a ranking signal instead of a hard drop in the Go L7 phase (AUDIT §2.4).
+- `go_core/main.go`:
+  - Added `SpeedAsFilter bool` and `SpeedConcurrency int` to `EngineSettings`.
+  - `processSingboxBatch` speed loop: speed is always recorded on the node (0.0 on a
+    failed measurement); the node still survives. `min_speed` only drops a node when
+    `speed_as_filter` is enabled. `semSpeed` concurrency is now configurable
+    (`speed_concurrency`, default 12, down from the hard-coded 40 that caused uplink
+    contention and understated speeds).
+  - Removed the `if speed < minSpeed { return 0, false }` cut from `testHTTPSpeed`;
+    the threshold decision moved to the caller. testHTTPSpeed now purely measures.
+  - Fixed a `go vet` hostport finding in `checkL4` (net.JoinHostPort) so vet is clean.
+- `core/engine.py`: added `speed_as_filter` and `speed_concurrency` to the settings
+  payload sent to the Go core.
+- `config/settings.yaml`: added `speed_as_filter: false` and `speed_concurrency: 12`
+  under `checking:` with comments.
+- `go_core/go.sum`: generated via `go mod tidy` (was missing; build failed without it).
+- **Checks:** `go build -o /dev/null ./...` OK, `go vet ./...` clean,
+  `python -m py_compile main.py merge.py core/*.py` OK. No tests/ dir yet (US-008).
+- **Learnings for future iterations:** see ## Codebase Patterns above.
+---
