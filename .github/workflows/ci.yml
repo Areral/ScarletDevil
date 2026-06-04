@@ -1,0 +1,42 @@
+# --- START OF FILE .github/workflows/ci.yml ---
+name: ⏣ Scarlet Devil CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    name: 🔍 Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⭳ Checkout
+        uses: actions/checkout@v4
+
+      - name: ⚙ Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: ⛨ Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: 📏 Ruff Lint
+        run: ruff check core/ tests/
+
+      - name: 🧪 Pytest
+        run: pytest -q
+
+      - name: ⚙ Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: 🔎 Go Vet
+        run: cd go_core && go vet ./...
