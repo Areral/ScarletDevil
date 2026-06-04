@@ -1,0 +1,42 @@
+# Ralph Progress Log
+Started: 2026-06-04
+Branch: ralph/website-overhaul
+---
+
+## Codebase Patterns
+
+### Website Generation
+- `merge.py:build_html()` reads `config/web/template.html`, injects `{{INJECT_CSS}}` and `{{INJECT_JS}}` inline, substitutes `{{UPDATE_TIME}}`, `{{PROXY_COUNT}}`, `{{MAX_SPEED}}`, `{{SUB_LINK}}`
+- Template uses `{{UPPERCASE}}` placeholder syntax (NOT Handlebars `{{variable}}` — these are simple string replacements)
+- CSS is in `config/web/style.css`, JS in `config/web/main.js` — both injected inline into the final `index.html`
+- `vercel.json` handles URL rewrites: `/sub` → `/sub_all.txt`, `/sub/bs` → `/sub_bs.txt`, etc.
+
+### Subscription File Format
+- Lines starting with `#` are metadata (profile-title, profile-update-interval)
+- Subscription URLs are one per line, ordered by speed (fastest first from Exporter)
+- `Exporter.save_files()` generates per-shard files like `sub_all_{i}.txt`, `sub_bs_{i}.txt`, etc.
+- `merge.py:merge_subscription_files()` deduplicates across shards (VMess-aware dedup via `_vmess_dedup_key`)
+- **Gotcha:** `sorted(unique_map.values())` re-orders alphabetically, destroying speed sort — FIXED (removed sorted)
+
+### Exporter Architecture
+- `Exporter._build_url(node, name)` builds the subscription URL per protocol (vless/vmess/trojan/ss/hy2)
+- Node filtering: `is_bs` field for BS class, `ru_verified` for RU-verified, `protocol` field for protocol name
+- Protocol values: `"vless"`, `"vmess"`, `"trojan"`, `"ss"`, `"hysteria2"` (lowercase)
+
+### Config Pattern
+- `config/settings.yaml` loaded via pydantic-settings in `core/settings.py` → singleton `CONFIG`
+- `CONFIG.app` has `public_url`, `channel_tag`; `CONFIG.TG_BOT_TOKEN`, `CONFIG.TG_CHAT_ID` for Telegram
+
+---
+
+## 2026-06-04 (prior session) - US-W01 / US-W08 (partial)
+- **Exporter** (`core/exporter.py`): Added protocol-based node filtering and file generation:
+  - `nodes_vless`, `nodes_vmess`, `nodes_trojan`, `nodes_ss`, `nodes_hy2` list comprehensions
+  - New file tuples in save_files: `sub_vless{suffix}.txt`, `sub_vmess{suffix}.txt`, etc.
+- **Merge** (`merge.py`):
+  - Removed `sorted()` from `merge_subscription_files` — now preserves insertion order (speed sort)
+  - Added 5 new `merge_subscription_files()` calls for protocol-specific patterns
+- **Remaining for US-W01:** vercel.json routes, modal window with protocol cards
+- **Remaining for US-W08:** build_html() statistics placeholders ({{NODE_STATS_JSON}}, per-protocol counts)
+
+---

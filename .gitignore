@@ -1,0 +1,19 @@
+# Runtime data / IPC files (Python <-> Go JSON handoff)
+data/
+
+# Go core build artifacts
+go_core/angra_core
+go_core/angra_core.exe
+
+# Logs
+*.log
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Ralph harness scratch
+.last-branch
+
+# Archived runs
+archive/
