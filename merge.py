@@ -39,19 +39,61 @@ async def send_telegram_report(stats: dict) -> None:
         if stats["dead_sources"] else ""
     )
 
+    # Overall survival rate (US-C07): unique alive / total parsed
+    parsed = stats.get("parsed", 0)
+    survival_rate = (stats["unique_alive"] / parsed * 100.0) if parsed > 0 else 0.0
+    survival_warn = " ⚠️" if survival_rate < 0.5 else ""
+
     msg = (
         f"🦇 <b>Scarlet Devil | Matrix Report</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"📡 <b>Собрано (Total):</b> <code>{stats['parsed']:,}</code>\n"
         f"🛡️ <b>Убито L4:</b> <code>{stats['l4_dropped']:,}</code>\n"
         f"🔋 <b>Живых (Unique):</b> <code>{stats['unique_alive']:,}</code>\n"
+        f"🩺 <b>Survival Rate:</b> <code>{survival_rate:.2f}%</code>{survival_warn}\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"👻 <b>Nightbird (БС):</b> <code>{stats['bs_count']:,}</code>\n"
         f"☄️ <b>Vampire Dash (ЧС):</b> <code>{stats['unique_alive'] - stats['bs_count']:,}</code>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"⚡ <b>Max Speed:</b> <code>{stats['top_speed']:.1f} Mbps</code>\n\n"
-        f"⚙️ <b>Matrix Performance:</b>\n"
+        f"⚡ <b>Max Speed:</b> <code>{stats['top_speed']:.1f} Mbps</code>\n"
     )
+
+    # Best / worst drone by survival rate (US-C07)
+    drone_surv = stats.get("drone_survival", {})
+    if drone_surv:
+        best = max(drone_surv.items(), key=lambda kv: kv[1])
+        worst = min(drone_surv.items(), key=lambda kv: kv[1])
+        msg += (
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🏆 <b>Лучший дрон:</b> <code>#{best[0]} ({best[1]:.2f}%)</code>\n"
+            f"🪫 <b>Худший дрон:</b> <code>#{worst[0]} ({worst[1]:.2f}%)</code>\n"
+        )
+
+    # Top-3 countries by node count (US-C07)
+    countries = stats.get("country_stats", [])[:3]
+    if countries:
+        msg += f"━━━━━━━━━━━━━━━━━━\n🌍 <b>Топ стран:</b>\n"
+        for c in countries:
+            msg += f"   └ <code>{c['code']}</code>: {c['count']:,}\n"
+
+    # Top-3 sources by yield (US-C07)
+    top_sources = stats.get("top_sources", [])[:3]
+    if top_sources:
+        msg += f"━━━━━━━━━━━━━━━━━━\n📊 <b>Топ источников (yield):</b>\n"
+        for s in top_sources:
+            msg += f"   └ <code>{s['yield_pct']}%</code> ({s['alive']} alive)\n"
+
+    # Failure reason breakdown (US-C07) — top 5 reasons
+    failure_reasons = stats.get("failure_reasons", {})
+    if failure_reasons:
+        ranked_fail = sorted(failure_reasons.items(), key=lambda kv: kv[1], reverse=True)[:5]
+        msg += f"━━━━━━━━━━━━━━━━━━\n🔻 <b>Причины отказов:</b>\n"
+        for reason, cnt in ranked_fail:
+            if cnt <= 0:
+                continue
+            msg += f"   └ <code>{reason}</code>: {cnt:,}\n"
+
+    msg += f"━━━━━━━━━━━━━━━━━━\n⚙️ <b>Matrix Performance:</b>\n"
     for shard_idx, dur in sorted(stats["durations"].items()):
         msg += f"   └ Drone {shard_idx}: <code>{dur:.1f}s</code>\n"
     msg += (
@@ -230,6 +272,9 @@ def main() -> None:
         "unique_alive": 0,
         "bs_count":     0,
         "country_stats": [],
+        "drone_survival": {},
+        "failure_reasons": {},
+        "top_sources":  [],
     }
 
     GHA.group("① COLLECT — Reading Drone Telemetry")
@@ -258,6 +303,22 @@ def main() -> None:
             stats["durations"][shard_idx] = dur
             for src in data.get("dead_sources", []):
                 stats["dead_sources"].add(src)
+
+            # Per-drone survival rate (US-C07): alive / parsed
+            if parsed > 0:
+                stats["drone_survival"][shard_idx] = alive / parsed * 100.0
+
+            # Aggregate failure reasons (US-C07): L4 reasons + L7 stats breakdown
+            for reason, cnt in (data.get("l4_failure_reasons") or {}).items():
+                if reason == "total":
+                    continue
+                stats["failure_reasons"][reason] = stats["failure_reasons"].get(reason, 0) + cnt
+            for reason, cnt in (data.get("l7_stats") or {}).items():
+                if reason in ("total", "survived"):
+                    continue
+                if not isinstance(cnt, int):
+                    continue
+                stats["failure_reasons"][reason] = stats["failure_reasons"].get(reason, 0) + cnt
 
             # Aggregate speed stats (US-C04) — weighted by drone alive count
             drone_alive = alive
@@ -318,6 +379,7 @@ def main() -> None:
         logger.info(f"  📊 Top-{top_n} sources by yield:")
         for url, yd in ranked[:top_n]:
             yp = yd["alive"] / max(yd["parsed"], 1) * 100
+            stats["top_sources"].append({"url": url, "alive": yd["alive"], "yield_pct": round(yp, 1)})
             logger.info(f"     {yp:5.1f}%  alive={yd['alive']:>4}  parsed={yd['parsed']:>5}  {url[:80]}")
         if len(ranked) > top_n:
             bottom_n = min(3, len(ranked) - top_n)
