@@ -111,7 +111,8 @@ jobs:
         run: |
           git config --global user.name "Scarlet Devil Bot"
           git config --global user.email "bot@scarletdevil.net"
-          git add index.html sub_all.txt sub_bs.txt sub_chs.txt
+          git add index.html sub_all.txt sub_bs.txt sub_chs.txt sub_ru.txt \
+                  sub_vless.txt sub_vmess.txt sub_trojan.txt sub_ss.txt sub_hy2.txt
           
           if git diff --staged --quiet; then
             exit 0

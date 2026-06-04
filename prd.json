@@ -155,7 +155,7 @@
         "`python -c \"import yaml; yaml.safe_load(open('.github/workflows/update.yml'))\"` — валидный YAML"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "Связано с US-W01 и US-W08. Новые маршруты должны следовать паттерну /sub/<protocol>."
     },
     {

@@ -230,3 +230,17 @@ Branch: ralph/website-overhaul
   - Паттерн «blob + fallback»: единый JSON-плейсхолдер как источник правды, индивидуальные data-атрибуты как резерв — даёт и чистый контракт (AC), и устойчивость рендеринга если blob повреждён.
 ---
 
+## 2026-06-04 - US-W09
+- **What was implemented:**
+  - **.github/workflows/update.yml** «Sync & Deploy» step: расширен `git add` с 3 файлов (index.html, sub_all.txt, sub_bs.txt, sub_chs.txt) до всех 9 подписок — добавлены sub_ru.txt, sub_vless.txt, sub_vmess.txt, sub_trojan.txt, sub_ss.txt, sub_hy2.txt. Теперь протокольные/RU подписки публикуются вместе с сайтом (git push --force на ту же ветку = деплой-источник для Vercel/gh-pages).
+  - **vercel.json:** rewrites для /sub/vless, /sub/vmess, /sub/trojan, /sub/ss, /sub/hy2 (+ /sub/ru) и headers (Content-Type text/plain, Cache-Control no-store, CORS *) уже были на месте из US-W01/US-W04 — проверены, дублировать не нужно.
+- **Files changed:** .github/workflows/update.yml, prd.json, progress.txt
+- **Verification:**
+  - `python -c "import json; json.load(open('vercel.json'))"` — OK
+  - `python -c "import yaml; yaml.safe_load(open('.github/workflows/update.yml', encoding='utf-8'))"` — OK
+- **Learnings for future iterations:**
+  - merge.py пишет ВСЕ 9 подписок в корень репо: sub_all/bs/chs/ru/vless/vmess/trojan/ss/hy2.txt (см. merge_subscription_files вызовы ~строки 264-305). Любая новая подписка должна быть добавлена в `git add` шага «Sync & Deploy», иначе она генерируется но не публикуется.
+  - **Gotcha:** прежняя заметка про «cp1251 encoding» update.yml неверна — файл валидный UTF-8 и грузится yaml.safe_load без ошибок (нужно явно указать `encoding='utf-8'` при open на Windows, где дефолтная локаль cp1251).
+  - Vercel header-правило `/(.*sub.*)` покрывает и source-пути `/sub/<proto>`, и destination `sub_<proto>.txt` — отдельные header-блоки для каждого протокола не нужны.
+  - Деплой = `git push --force` в той же ветке (не отдельная gh-pages orphan-ветка); add всех артефактов в одном коммите.
+---
