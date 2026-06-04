@@ -45,6 +45,7 @@ class ProxyNode(BaseModel):
     speed: float = 0.0
     country: str = "UN"
     is_bs: bool = False
+    ru_verified: bool = False
     source_url: str = ""
 
     @property

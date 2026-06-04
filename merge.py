@@ -282,6 +282,11 @@ def main() -> None:
         "sub_chs.txt",
         "Scarlet Devil | Vampire Dash (ЧС)",
     )
+    merge_subscription_files(
+        "shards_temp/shard-data-*/sub_ru_*.txt",
+        "sub_ru.txt",
+        "Scarlet Devil | Remilia (RU-verified)",
+    )
     GHA.endgroup()
 
     GHA.group("③ POOL — Updating Rolling Pool of Historically-Working Nodes")

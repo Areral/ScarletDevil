@@ -62,6 +62,11 @@ jobs:
           SUBSCRIPTION_SOURCES: ${{ secrets.SUBSCRIPTION_SOURCES }}
           SHARD_INDEX: ${{ matrix.shard }}
           SHARD_COUNT: 4
+          # RU_VERDICT_FILE (optional): path to a JSON list of node strict_ids that an
+          # external RU probe worker confirmed reachable from inside Russia. When set, the
+          # matching nodes are flagged ru_verified and emitted to sub_ru.txt. When unset,
+          # sub_ru.txt is simply empty. To enable, add a step before this one that fetches
+          # the worker's verdict (artifact/release/curl) and export RU_VERDICT_FILE here.
         run: python main.py
 
       - name: 📦 Upload Artifacts
@@ -114,7 +119,7 @@ jobs:
 
           # Save generated files before switching branches
           mkdir -p /tmp/publish
-          cp sub_all.txt sub_bs.txt sub_chs.txt index.html vercel.json /tmp/publish/
+          cp sub_all.txt sub_bs.txt sub_chs.txt sub_ru.txt index.html vercel.json /tmp/publish/
 
           # Switch to gh-pages (create orphan if first run)
           if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
@@ -130,6 +135,6 @@ jobs:
           cp /tmp/publish/* .
 
           # Normal commit — no amend, no force-push on main
-          git add sub_all.txt sub_bs.txt sub_chs.txt index.html vercel.json
+          git add sub_all.txt sub_bs.txt sub_chs.txt sub_ru.txt index.html vercel.json
           git commit -m "⏣ Scarlet Matrix Sync: $(date -u)" || exit 0
           git push origin gh-pages

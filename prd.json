@@ -146,7 +146,7 @@
         "`python -m py_compile core/exporter.py core/models.py` passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "AUDIT.md §5.1 — the single biggest lever for real-world RU effectiveness. Code-only scaffolding here; the actual RU worker is operational, not part of this repo's CI."
     }
   ]

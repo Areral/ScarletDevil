@@ -249,9 +249,11 @@ class Exporter:
         if not nodes:
             nodes_bs: List[ProxyNode] = []
             nodes_chs: List[ProxyNode] = []
+            nodes_ru: List[ProxyNode] = []
         else:
             nodes_bs = [n for n in nodes if n.is_bs]
             nodes_chs = [n for n in nodes if not n.is_bs]
+            nodes_ru = [n for n in nodes if n.ru_verified]
 
         suffix = f"_{shard_index}" if shard_index >= 0 else ""
         os.makedirs("data", exist_ok=True)
@@ -260,6 +262,7 @@ class Exporter:
             (f"sub_all{suffix}.txt", nodes, "Scarlet Devil | Gungnir (MIX)"),
             (f"sub_bs{suffix}.txt", nodes_bs, "Scarlet Devil | Nightbird (БС)"),
             (f"sub_chs{suffix}.txt", nodes_chs, "Scarlet Devil | Vampire Dash (ЧС)"),
+            (f"sub_ru{suffix}.txt", nodes_ru, "Scarlet Devil | Remilia (RU-verified)"),
         ]:
             try:
                 with open(f"data/{filename}", "w", encoding="utf-8") as f:

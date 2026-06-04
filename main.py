@@ -17,6 +17,45 @@ from core.validator import RKNValidator
 from core.models import ProxyNode
 
 
+def apply_ru_verdict(nodes: list) -> int:
+    """Flag nodes as ru_verified from an external RU probe worker's verdict.
+
+    The verdict is env-gated via RU_VERDICT_FILE: a JSON file holding the list of
+    node strict_ids that an RU-side worker confirmed reachable from inside Russia.
+    Accepts a bare JSON list of ids, or an object with a "verified"/"ids" key.
+    When the env var is unset or the file is missing, nothing is flagged and
+    sub_ru.txt is simply empty (no failure).
+    """
+    verdict_file = os.environ.get("RU_VERDICT_FILE", "")
+    if not verdict_file:
+        return 0
+    if not os.path.exists(verdict_file):
+        logger.warning(
+            f"  RU verdict: {verdict_file} not found — sub_ru will be empty"
+        )
+        return 0
+    try:
+        with open(verdict_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            data = data.get("verified", data.get("ids", []))
+        verified = {str(x) for x in data}
+    except Exception as exc:
+        logger.warning(f"  RU verdict: failed to load {verdict_file}: {exc}")
+        return 0
+
+    flagged = 0
+    for n in nodes:
+        if n.strict_id in verified:
+            n.ru_verified = True
+            flagged += 1
+    logger.info(
+        f"  RU verdict: flagged {flagged}/{len(nodes)} nodes as ru_verified "
+        f"({len(verified)} ids in verdict)"
+    )
+    return flagged
+
+
 async def main() -> None:
     start_time = time.perf_counter()
 
@@ -111,6 +150,8 @@ async def main() -> None:
         for n in alive_nodes:
             unique_alive[n.strict_id] = n
         alive_nodes = list(unique_alive.values())
+
+        apply_ru_verdict(alive_nodes)
 
         bs_count = sum(1 for n in alive_nodes if n.is_bs)
         top_speed = max((n.speed for n in alive_nodes), default=0.0)

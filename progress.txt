@@ -320,3 +320,40 @@ Started: Thu Jun  4 04:19:02 RTZ 2026
   - `os.path.getmtime` gives a cheap "list age" without storing a timestamp
     inside the cache file.
 ---
+
+## Thu Jun  4 - US-010 (RU-verified subscription scaffolding)
+- Added code-only scaffolding for an RU-verified subscription (AUDIT §5.1).
+- `core/models.py`: added `ru_verified: bool = False` to `ProxyNode` (defaults
+  False → backwards compatible with old NODES_FILE / pool dumps).
+- `core/exporter.py`: `save_files` now also computes `nodes_ru = [n for n in nodes
+  if n.ru_verified]` and writes `sub_ru{suffix}.txt`
+  (title "Scarlet Devil | Remilia (RU-verified)") alongside all/bs/chs.
+- `main.py`: added module-level `apply_ru_verdict(nodes)` — env-gated by
+  `RU_VERDICT_FILE`. Reads a JSON verdict (bare list of strict_ids, or
+  `{"verified":[...]}` / `{"ids":[...]}`), flags matching alive nodes
+  `ru_verified=True`. Unset/missing file → nothing flagged → empty sub_ru
+  (no failure). Called after dedup, before export.
+- `merge.py`: MERGE group now also merges `sub_ru_*.txt` shards into `sub_ru.txt`
+  (always produced, header-only when empty). Pool group unchanged — RU nodes are a
+  subset of sub_all so already counted in alive_uris.
+- `vercel.json`: added rewrite `/sub/ru -> /sub_ru.txt`.
+- `.github/workflows/update.yml`: publish step copies/adds/commits `sub_ru.txt` to
+  gh-pages; added a documenting comment on `RU_VERDICT_FILE` in the drone step.
+- `README.md`: new "🇷🇺 RU-проба" section documenting the ingestion contract and how
+  to run an external RU probe worker. `AUDIT.md` §5.1 plan item marked [~] with note.
+- **Checks:** `python -m py_compile main.py merge.py parse_only.py core/*.py` OK.
+  YAML (update.yml) + JSON (vercel.json) load OK. `import core.util` OK.
+  `pytest -q` → 47 skipped (exit 0, pydantic caveat). Go untouched.
+- **Learnings for future iterations:**
+  - The RU worker identifies nodes by `strict_id` (proto:server:port:ident:transport),
+    computed via `LinkParser.parse_link(uri).strict_id` — the same canonical id used by
+    the pool (US-006) and dedup. Verdict files therefore round-trip through the same
+    parse path; no new id scheme was introduced.
+  - `sub_ru` is built per-shard in the drone (Exporter), then merged — same fan-out/merge
+    pattern as sub_all/bs/chs. The upload glob `data/sub_*.txt` already captured the new
+    shard files; no artifact-path change was needed.
+  - Adding a new ProxyNode bool field is safe for NODES_FILE/pool round-trips because
+    pydantic v2 fills defaults for absent keys on `model_validate`.
+  - To wire RU verdicts into CI, add a step before "Execute Shard Protocol" that fetches
+    the worker's JSON and exports `RU_VERDICT_FILE`; the code is transport-agnostic.
+---

@@ -7,6 +7,7 @@
     { "source": "/sub/all", "destination": "/sub_all.txt" },
     { "source": "/sub/bs", "destination": "/sub_bs.txt" },
     { "source": "/sub/chs", "destination": "/sub_chs.txt" },
+    { "source": "/sub/ru", "destination": "/sub_ru.txt" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
