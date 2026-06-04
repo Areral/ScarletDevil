@@ -146,7 +146,7 @@ def merge_subscription_files(pattern: str, output_file: str, title: str) -> int:
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(f"#profile-title: {title}\n")
         f.write("#profile-update-interval: 6\n")
-        for link in sorted(unique_map.values()):
+        for link in unique_map.values():
             f.write(f"{link}\n")
 
     logger.info(f"  {output_file:<20} ← {len(files):>2} shards  →  {len(unique_map):>6,} unique nodes")
@@ -216,6 +216,31 @@ def main() -> None:
         "shards_temp/shard-data-*/sub_chs_*.txt",
         "sub_chs.txt",
         "Scarlet Devil | Vampire Dash (ЧС)",
+    )
+    merge_subscription_files(
+        "shards_temp/shard-data-*/sub_vless_*.txt",
+        "sub_vless.txt",
+        "Scarlet Devil | VLESS",
+    )
+    merge_subscription_files(
+        "shards_temp/shard-data-*/sub_vmess_*.txt",
+        "sub_vmess.txt",
+        "Scarlet Devil | VMess",
+    )
+    merge_subscription_files(
+        "shards_temp/shard-data-*/sub_trojan_*.txt",
+        "sub_trojan.txt",
+        "Scarlet Devil | Trojan",
+    )
+    merge_subscription_files(
+        "shards_temp/shard-data-*/sub_ss_*.txt",
+        "sub_ss.txt",
+        "Scarlet Devil | Shadowsocks",
+    )
+    merge_subscription_files(
+        "shards_temp/shard-data-*/sub_hy2_*.txt",
+        "sub_hy2.txt",
+        "Scarlet Devil | Hysteria2",
     )
     GHA.endgroup()
 

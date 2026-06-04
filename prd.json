@@ -17,7 +17,7 @@
         "`python -m py_compile merge.py core/exporter.py` проходит без ошибок"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Частично реализовано: exporter.py и merge.py уже содержат генерацию протокольных файлов и исправление sorted(). Нужно: vercel.json, модальное окно в JS/HTML."
     },
     {

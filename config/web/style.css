@@ -357,6 +357,32 @@ section:last-of-type { border-bottom: none; }
 .badge-reality { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
 .badge-fast { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
 .badge-mix { background: rgba(225, 29, 72, 0.15); color: #fda4af; border: 1px solid rgba(225, 29, 72, 0.3); }
+
+.sub-card.vless { border-color: rgba(139, 92, 246, 0.3); }
+.sub-card.vless::before { background: var(--touhou-purple); }
+.sub-card.vless:hover { border-color: var(--touhou-purple); box-shadow: 0 0 30px rgba(139, 92, 246, 0.15); }
+.badge-vless { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+
+.sub-card.vmess { border-color: rgba(56, 189, 248, 0.3); }
+.sub-card.vmess::before { background: var(--cyber-blue); }
+.sub-card.vmess:hover { border-color: var(--cyber-blue); box-shadow: 0 0 30px rgba(56, 189, 248, 0.15); }
+.badge-vmess { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.3); }
+
+.sub-card.trojan { border-color: rgba(250, 204, 21, 0.3); }
+.sub-card.trojan::before { background: #facc15; }
+.sub-card.trojan:hover { border-color: #facc15; box-shadow: 0 0 30px rgba(250, 204, 21, 0.15); }
+.badge-trojan { background: rgba(250, 204, 21, 0.15); color: #fde047; border: 1px solid rgba(250, 204, 21, 0.3); }
+
+.sub-card.ss { border-color: rgba(16, 185, 129, 0.3); }
+.sub-card.ss::before { background: var(--cyber-green); }
+.sub-card.ss:hover { border-color: var(--cyber-green); box-shadow: 0 0 30px rgba(16, 185, 129, 0.15); }
+.badge-ss { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+.sub-card.hy2 { border-color: rgba(244, 114, 182, 0.3); }
+.sub-card.hy2::before { background: var(--touhou-sakura); }
+.sub-card.hy2:hover { border-color: var(--touhou-sakura); box-shadow: 0 0 30px rgba(244, 114, 182, 0.15); }
+.badge-hy2 { background: rgba(244, 114, 182, 0.15); color: #f9a8d4; border: 1px solid rgba(244, 114, 182, 0.3); }
+
 .sub-desc { font-size: 0.85rem; color: var(--text-dim); line-height: 1.4; }
 .sub-tech { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-dark); margin-top: 4px; font-weight: 700;}
 

@@ -6,6 +6,11 @@
     { "source": "/sub/all", "destination": "/sub_all.txt" },
     { "source": "/sub/bs", "destination": "/sub_bs.txt" },
     { "source": "/sub/chs", "destination": "/sub_chs.txt" },
+    { "source": "/sub/vless", "destination": "/sub_vless.txt" },
+    { "source": "/sub/vmess", "destination": "/sub_vmess.txt" },
+    { "source": "/sub/trojan", "destination": "/sub_trojan.txt" },
+    { "source": "/sub/ss", "destination": "/sub_ss.txt" },
+    { "source": "/sub/hy2", "destination": "/sub_hy2.txt" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

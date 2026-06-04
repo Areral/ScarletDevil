@@ -40,3 +40,17 @@ Branch: ralph/website-overhaul
 - **Remaining for US-W08:** build_html() statistics placeholders ({{NODE_STATS_JSON}}, per-protocol counts)
 
 ---
+
+## 2026-06-04 - US-W01 (completed)
+- **What was implemented:**
+  - vercel.json: Added 5 rewrite rules for protocol subscriptions (/sub/vless → sub_vless.txt, /sub/vmess, /sub/trojan, /sub/ss, /sub/hy2)
+  - template.html: Added 5 protocol subscription cards to the configs-modal (VLESS, VMess, Trojan, Shadowsocks, Hysteria2) with Font Awesome icons and Russian descriptions
+  - style.css: Added CSS color classes for each protocol card (vless=purple, vmess=blue, trojan=gold, ss=green, hy2=sakura) with hover effects and badges
+- **Files changed:** vercel.json, config/web/template.html, config/web/style.css
+- **Backend already done (prior session):** exporter.py protocol file generation, merge.py protocol merge calls, sorted() removal
+- **Learnings for future iterations:**
+  - The vercel.json header regex `/(.*sub.*)` already covers all `/sub/*` paths — no new header rules needed for protocol routes
+  - The `copySub()` JS function constructs URL as `BASE_URL + path` — vercel routes and JS paths must agree
+  - Sub-card CSS follows a consistent pattern: border color class, ::before accent bar, :hover glow, badge class
+  - All 8 subscription cards are now in a single scrollable grid; US-W04 will redesign this into a tabbed layout
+---

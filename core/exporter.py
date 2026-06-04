@@ -253,6 +253,12 @@ class Exporter:
             nodes_bs = [n for n in nodes if n.is_bs]
             nodes_chs = [n for n in nodes if not n.is_bs]
 
+        nodes_vless = [n for n in nodes if n.protocol == "vless"]
+        nodes_vmess = [n for n in nodes if n.protocol == "vmess"]
+        nodes_trojan = [n for n in nodes if n.protocol == "trojan"]
+        nodes_ss = [n for n in nodes if n.protocol == "ss"]
+        nodes_hy2 = [n for n in nodes if n.protocol == "hysteria2"]
+
         suffix = f"_{shard_index}" if shard_index >= 0 else ""
         os.makedirs("data", exist_ok=True)
 
@@ -260,6 +266,11 @@ class Exporter:
             (f"sub_all{suffix}.txt", nodes, "Scarlet Devil | Gungnir (MIX)"),
             (f"sub_bs{suffix}.txt", nodes_bs, "Scarlet Devil | Nightbird (БС)"),
             (f"sub_chs{suffix}.txt", nodes_chs, "Scarlet Devil | Vampire Dash (ЧС)"),
+            (f"sub_vless{suffix}.txt", nodes_vless, "Scarlet Devil | VLESS"),
+            (f"sub_vmess{suffix}.txt", nodes_vmess, "Scarlet Devil | VMess"),
+            (f"sub_trojan{suffix}.txt", nodes_trojan, "Scarlet Devil | Trojan"),
+            (f"sub_ss{suffix}.txt", nodes_ss, "Scarlet Devil | Shadowsocks"),
+            (f"sub_hy2{suffix}.txt", nodes_hy2, "Scarlet Devil | Hysteria2"),
         ]:
             try:
                 with open(f"data/{filename}", "w", encoding="utf-8") as f:
