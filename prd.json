@@ -59,7 +59,7 @@
         "`python -m py_compile parse_only.py main.py` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "AUDIT.md §2.1, §2.2"
     },
     {

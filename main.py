@@ -3,6 +3,7 @@ import asyncio
 import time
 import sys
 import os
+import json
 from loguru import logger
 
 import core.logger
@@ -13,6 +14,7 @@ from core.parser import LinkParser
 from core.engine import Inspector
 from core.exporter import Exporter
 from core.validator import RKNValidator
+from core.models import ProxyNode
 
 
 async def main() -> None:
@@ -29,8 +31,17 @@ async def main() -> None:
         GHA.endgroup()
 
         GHA.group("② PARSE — Fetching & Decoding Subscription Sources")
-        parser = LinkParser()
-        all_nodes = await parser.fetch_and_parse()
+        nodes_file = os.environ.get("NODES_FILE", "")
+        if nodes_file:
+            with open(nodes_file, "r", encoding="utf-8") as f:
+                raw_list = json.load(f)
+            all_nodes = [ProxyNode.model_validate(d) for d in raw_list]
+            logger.info(f"Loaded {len(all_nodes)} nodes from {nodes_file}")
+            source_metrics: dict = {}
+        else:
+            parser = LinkParser()
+            all_nodes = await parser.fetch_and_parse()
+            source_metrics = parser.metrics
 
         if not all_nodes:
             GHA.error("No valid nodes after parsing — aborting drone.")
@@ -39,12 +50,10 @@ async def main() -> None:
             return
 
         if shard_count > 1:
-            chunk = (len(all_nodes) + shard_count - 1) // shard_count
-            nodes = all_nodes[shard_index * chunk : (shard_index + 1) * chunk]
+            nodes = all_nodes[shard_index::shard_count]
             logger.info(
                 f"  Shard {shard_index + 1}/{shard_count} — "
-                f"zone: {nodes[0].config.server if nodes else '—'} … "
-                f"({len(nodes):,} / {len(all_nodes):,} nodes)"
+                f"({len(nodes):,} / {len(all_nodes):,} nodes, round-robin)"
             )
         else:
             nodes = all_nodes
@@ -64,12 +73,12 @@ async def main() -> None:
         logger.info(f"  L7 alive (raw)   {len(alive_nodes):>8,}  nodes")
 
         for node in alive_nodes:
-            if node.source_url in parser.metrics:
-                m = parser.metrics[node.source_url]
+            if node.source_url in source_metrics:
+                m = source_metrics[node.source_url]
                 m["alive"] = m.get("alive", 0) + 1
 
         dead_sources = [
-            url for url, m in parser.metrics.items()
+            url for url, m in source_metrics.items()
             if m.get("parsed", 0) > 0 and m.get("alive", 0) == 0
         ]
 
