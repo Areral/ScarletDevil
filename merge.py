@@ -153,6 +153,71 @@ def merge_subscription_files(pattern: str, output_file: str, title: str) -> int:
     return len(unique_map)
 
 
+POOL_PATH = "data/pool.json"
+
+
+def load_pool(path: str = POOL_PATH) -> list:
+    """Load the rolling pool of historically-working nodes."""
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            pool = json.load(f)
+        return pool if isinstance(pool, list) else []
+    except Exception:
+        return []
+
+
+def save_pool(pool: list, path: str = POOL_PATH) -> None:
+    """Persist the rolling pool to disk."""
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(pool, f, indent=2, ensure_ascii=False)
+
+
+def update_pool(alive_uris: set, path: str = POOL_PATH) -> dict:
+    """Update the rolling pool based on this run's surviving nodes.
+
+    - Pool nodes that survived: fail_count reset to 0, last_seen updated.
+    - Pool nodes that didn't survive: fail_count incremented.
+    - New survivors: added to pool with fail_count=0.
+    - Nodes with fail_count >= 3: evicted.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    existing = load_pool(path)
+
+    pool_by_uri = {entry["uri"]: entry for entry in existing}
+
+    updated = []
+    evicted = 0
+    added = 0
+
+    for uri, entry in pool_by_uri.items():
+        if uri in alive_uris:
+            entry["fail_count"] = 0
+            entry["last_seen"] = now
+            updated.append(entry)
+            alive_uris.discard(uri)
+        else:
+            entry["fail_count"] = entry.get("fail_count", 0) + 1
+            if entry["fail_count"] < 3:
+                updated.append(entry)
+            else:
+                evicted += 1
+
+    for uri in alive_uris:
+        updated.append({"uri": uri, "last_seen": now, "fail_count": 0})
+        added += 1
+
+    save_pool(updated, path)
+
+    logger.info(
+        f"  Pool updated: {len(updated)} entries "
+        f"(evicted={evicted}, new={added})"
+    )
+    return {"size": len(updated), "evicted": evicted, "added": added}
+
+
 def main() -> None:
     GHA.nexus_header()
 
@@ -219,11 +284,23 @@ def main() -> None:
     )
     GHA.endgroup()
 
-    GHA.group("③ BUILD — Compiling Dashboard (index.html)")
+    GHA.group("③ POOL — Updating Rolling Pool of Historically-Working Nodes")
+    alive_uris: set = set()
+    for sub_file in ["sub_all.txt", "sub_bs.txt", "sub_chs.txt"]:
+        if os.path.exists(sub_file):
+            with open(sub_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        alive_uris.add(line)
+    pool_stats = update_pool(alive_uris)
+    GHA.endgroup()
+
+    GHA.group("④ BUILD — Compiling Dashboard (index.html)")
     build_html(stats["unique_alive"], stats["top_speed"])
     GHA.endgroup()
 
-    GHA.group("④ NOTIFY — Sending Telegram Report")
+    GHA.group("⑤ NOTIFY — Sending Telegram Report")
     asyncio.run(send_telegram_report(stats))
     GHA.endgroup()
 

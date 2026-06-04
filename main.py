@@ -43,6 +43,31 @@ async def main() -> None:
             all_nodes = await parser.fetch_and_parse()
             source_metrics = parser.metrics
 
+        # --- Rolling pool: add historically-working nodes to the check set ---
+        pool_path = "data/pool.json"
+        pool_added = 0
+        fresh_ids = {n.strict_id for n in all_nodes}
+        if os.path.exists(pool_path):
+            try:
+                with open(pool_path, "r", encoding="utf-8") as f:
+                    pool_entries = json.load(f)
+                for entry in pool_entries:
+                    uri = entry.get("uri", "")
+                    if not uri:
+                        continue
+                    node = LinkParser.parse_link(uri)
+                    if node and node.strict_id not in fresh_ids:
+                        node.is_bs = RKNValidator.check_bs(node)
+                        all_nodes.append(node)
+                        fresh_ids.add(node.strict_id)
+                        pool_added += 1
+                if pool_added:
+                    logger.info(
+                        f"  Pool: added {pool_added} historically-working nodes to check set"
+                    )
+            except Exception as exc:
+                logger.warning(f"  Pool: failed to load {pool_path}: {exc}")
+
         if not all_nodes:
             GHA.error("No valid nodes after parsing — aborting drone.")
             logger.error("Нет валидных узлов после парсинга. Завершение.")

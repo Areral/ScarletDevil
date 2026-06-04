@@ -477,6 +477,24 @@ class LinkParser:
         except Exception:
             return None
 
+    @staticmethod
+    def parse_link(line: str) -> Optional[ProxyNode]:
+        """Parse a single proxy link into a ProxyNode, auto-detecting protocol."""
+        line = line.strip()
+        parsers = {
+            "vless://": LinkParser.parse_vless,
+            "vmess://": LinkParser.parse_vmess,
+            "trojan://": LinkParser.parse_trojan,
+            "ss://": LinkParser.parse_ss,
+            "hy2://": LinkParser.parse_hy2,
+            "hysteria2://": LinkParser.parse_hy2,
+            "hysteria://": LinkParser.parse_hy2,
+        }
+        for prefix, parser_fn in parsers.items():
+            if line.startswith(prefix):
+                return parser_fn(line)
+        return None
+
     async def _fetch_url_with_retry(self, session: aiohttp.ClientSession, url: str, retries: int = 3) -> str:
         async with self.semaphore:
             for attempt in range(retries):

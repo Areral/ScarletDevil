@@ -151,9 +151,59 @@ Started: Thu Jun  4 04:19:02 RTZ 2026
   - `ipaddress.IPv4Network(f"{addr}/24", strict=False)` is the correct way to
     get the /24 network from an IPv4 address — `strict=False` allows any host
     bits. `str(net)` returns `"x.y.z.0/24"`.
-  - The `_GEO_CACHE` is a class-level `Dict[str, str]` on `BatchEngine`,
-    shared across all `Inspector` instances within a process. The /24 key
-    strategy means once ANY drone resolves one IP in a /24, all subsequent
-    nodes in that /24 (even across different batches) reuse the result.
+  ## Thu Jun  4 - US-006 (Rolling pool of historically-working nodes)
+- Implemented a rolling pool of historically-working nodes (AUDIT §4.1).
+- `core/parser.py`:
+  - Added `LinkParser.parse_link(line)` static method — generic URI dispatcher that
+    auto-detects protocol prefix and delegates to the correct parser (parse_vless,
+    parse_vmess, parse_trojan, parse_ss, parse_hy2). Returns `ProxyNode | None`.
+    Handles `hysteria://` alias (redirects to parse_hy2). Essential for round-tripping
+    pool URIs back into checkable ProxyNodes.
+- `main.py`:
+  - After fresh nodes are loaded (from sources or NODES_FILE), loads `data/pool.json`
+    and parses each pooled URI via `LinkParser.parse_link`.
+  - Pool nodes not already in the fresh set (dedup by `strict_id`) are appended to
+    `all_nodes` with `is_bs` set via `RKNValidator.check_bs`.
+  - Pool loading happens BEFORE the empty-nodes abort check — so a drone can still
+    operate on pool-only nodes when fresh sources are down.
+  - If pool.json is missing or corrupt, logs a warning and continues.
+- `merge.py`:
+  - Added `load_pool(path)` — loads pool.json, returns `[]` on missing/corrupt.
+  - Added `save_pool(pool, path)` — creates `data/` dir if needed, writes JSON.
+  - Added `update_pool(alive_uris, path)` — the core pool maintenance logic:
+    1. Pool nodes found in `alive_uris` → fail_count reset to 0, last_seen updated.
+    2. Pool nodes NOT in `alive_uris` → fail_count incremented; evicted at >= 3.
+    3. Alive URIs not yet in pool → added with fail_count=0, last_seen=now.
+  - New `③ POOL` group in `main()`: reads alive URIs from the merged output files
+    (`sub_all.txt`, `sub_bs.txt`, `sub_chs.txt`), calls `update_pool`, logs sizes.
+  - Subsequent group numbers renumbered (④ BUILD, ⑤ NOTIFY).
+- **Checks:** `python -m py_compile main.py merge.py core/parser.py core/engine.py
+  core/exporter.py` OK. `python -c "import core.util"` OK. Pool logic verified with
+  7 table-driven unit cases (first-run, fail-increment, eviction-at-3, recovery-reset,
+  new-node-addition, differential-eviction, empty-run).
+- **Learnings for future iterations:**
+  - `LinkParser.parse_link` is now the canonical single-URI entry point — use it
+    anywhere a raw proxy URI needs to become a ProxyNode (pool loading, manual
+    injection, RU verdict ingestion, etc.).
+  - Pool persistence lives in `data/pool.json` (gitignored). For CI, `merge.py`
+    produces it and `main.py` consumes it in the next run. An `actions/cache` or
+    `upload/download-artifact` step is needed in the workflow to carry pool.json
+    between runs — the Python code is CI-transport-agnostic.
+  - The pool's fail_count tracks CONSECUTIVE failures (reset on any success). This
+    is resilient to transient network issues — a good node must fail 3 runs IN A ROW
+    to be evicted.
+  - `update_pool` mutates the `alive_uris` set in place (`.discard()` as it matches
+    existing entries) — callers should pass a copy if they need the original set
+    afterwards.
+  - Pool URIs round-trip through `Exporter._build_url` → `LinkParser.parse_link`.
+    This is the same parse-export pair used everywhere, so pool nodes are checker-
+    compatible by construction.
+---
+
+---
+- The `_GEO_CACHE` is a class-level `Dict[str, str]` on `BatchEngine`,
+  shared across all `Inspector` instances within a process. The /24 key
+  strategy means once ANY drone resolves one IP in a /24, all subsequent
+  nodes in that /24 (even across different batches) reuse the result.
 ---
 
