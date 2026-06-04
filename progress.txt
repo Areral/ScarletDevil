@@ -54,3 +54,25 @@ Branch: ralph/website-overhaul
   - Sub-card CSS follows a consistent pattern: border color class, ::before accent bar, :hover glow, badge class
   - All 8 subscription cards are now in a single scrollable grid; US-W04 will redesign this into a tabbed layout
 ---
+
+## 2026-06-04 - US-W02
+- **What was implemented:**
+  - Added 11 new apps to APP_DATABASE: FlClash, Mihomo (Clash Meta), AmneziaWG, SagerNet, FoXray, Surge, Stash, Sing-box CLI, MikroTik (RouterOS), OpenWRT, NekoRay
+  - Added `protocols` field (array of supported protocols) to all 22 app entries
+  - Added new `router` platform with 4 apps: mikrotik, openwrt, singbox_cli, mihomo
+  - Expanded `androidtv` from 1 to 3 apps: v2rayng, sagernet, flclash
+  - Added router tab button in template.html
+  - Added protocol badge display in updateUI() with <div id="protocol-display">
+  - Added .proto-tag CSS class for protocol badge styling (JetBrains Mono, sakura color)
+  - Each new app has a 5+ step guide with specific button/menu names
+  - App expansion across all existing platforms (e.g., windows: +flclash, +mihomo, +amneziawg, +singbox_cli, +nekoray)
+- **Files changed:** config/web/main.js, config/web/template.html, config/web/style.css
+- **Learnings for future iterations:**
+  - APP_DATABASE keys use lowercase_with_underscores convention
+  - Each app entry = {name, icon, url, protocols[], guide} — protocols is an array for future filtering
+  - updateUI() is the central render function: it rebuilds the app grid, sets download URL, name, instruction, and now protocols
+  - The `protocol-display` div sits between the download button and "2. Импорт и запуск" heading
+  - For router apps (MikroTik, OpenWRT), the guide format differs: it includes CLI commands and config snippets
+  - Font Awesome 6 Free icons: verify availability before using — prefer solid style (fa-solid)
+  - Quality checks for JS: `node --check` catches syntax errors without executing DOM-dependent code
+---
