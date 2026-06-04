@@ -123,7 +123,7 @@
         "Все новые секции добавлены в боковую навигацию и используют существующие CSS-классы"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Сейчас сайт: 5 секций + legal + footer. Новые секции добавляют содержательную ценность."
     },
     {
@@ -140,7 +140,7 @@
         "`python -m py_compile merge.py core/exporter.py` проходит без ошибок"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Частично реализовано: exporter и merge уже генерируют протокольные файлы. Нужно: build_html со статистикой."
     },
     {

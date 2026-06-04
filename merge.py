@@ -87,7 +87,7 @@ async def send_telegram_report(stats: dict) -> None:
             logger.error(f"  Ошибка отправки в Telegram: {exc}")
 
 
-def build_html(total_alive: int, top_speed: float) -> None:
+def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
     template_path = "config/web/template.html"
     if not os.path.exists(template_path):
         logger.warning(f"  Шаблон не найден: {template_path} — пропуск.")
@@ -110,6 +110,25 @@ def build_html(total_alive: int, top_speed: float) -> None:
         now = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=3)
         public_url = CONFIG.app.get("public_url", "")
 
+        country_stats_json = json.dumps(stats.get("country_stats", []), ensure_ascii=False)
+
+        # Consolidated node statistics blob — single source of truth for the
+        # client-side charts (data attributes below mirror these values).
+        node_stats = {
+            "total":     int(total_alive),
+            "max_speed": int(top_speed),
+            "bs":        int(stats.get("bs_count", 0)),
+            "chs":       int(stats.get("chs_count", 0)),
+            "ru":        int(stats.get("ru_count", 0)),
+            "vless":     int(stats.get("vless_count", 0)),
+            "vmess":     int(stats.get("vmess_count", 0)),
+            "trojan":    int(stats.get("trojan_count", 0)),
+            "ss":        int(stats.get("ss_count", 0)),
+            "hy2":       int(stats.get("hy2_count", 0)),
+            "countries": stats.get("country_stats", []),
+        }
+        node_stats_json = json.dumps(node_stats, ensure_ascii=False)
+
         html_out = (
             tpl.replace("{{INJECT_CSS}}", css)
                .replace("{{INJECT_JS}}", js)
@@ -117,6 +136,16 @@ def build_html(total_alive: int, top_speed: float) -> None:
                .replace("{{UPDATE_TIME}}", now.strftime("%d.%m %H:%M"))
                .replace("{{PROXY_COUNT}}", str(total_alive))
                .replace("{{MAX_SPEED}}", str(int(top_speed)))
+               .replace("{{BS_COUNT}}", str(stats.get("bs_count", 0)))
+               .replace("{{CHS_COUNT}}", str(stats.get("chs_count", 0)))
+               .replace("{{RU_COUNT}}", str(stats.get("ru_count", 0)))
+               .replace("{{VLESS_COUNT}}", str(stats.get("vless_count", 0)))
+               .replace("{{VMESS_COUNT}}", str(stats.get("vmess_count", 0)))
+               .replace("{{TROJAN_COUNT}}", str(stats.get("trojan_count", 0)))
+               .replace("{{SS_COUNT}}", str(stats.get("ss_count", 0)))
+               .replace("{{HY2_COUNT}}", str(stats.get("hy2_count", 0)))
+               .replace("{{COUNTRY_STATS_JSON}}", country_stats_json)
+               .replace("{{NODE_STATS_JSON}}", node_stats_json)
         )
         with open("index.html", "w", encoding="utf-8") as f:
             f.write(html_out)
@@ -151,6 +180,35 @@ def merge_subscription_files(pattern: str, output_file: str, title: str) -> int:
 
     logger.info(f"  {output_file:<20} ← {len(files):>2} shards  →  {len(unique_map):>6,} unique nodes")
     return len(unique_map)
+
+
+def _extract_country_stats(sub_file: str, top_n: int = 10) -> list:
+    """Extract country codes from subscription URL fragments (#NN-name)."""
+    import re
+    country_re = re.compile(r"#(\w{2})[\s\-_]")
+
+    country_counts: dict = {}
+    if not os.path.exists(sub_file):
+        return []
+
+    try:
+        with open(sub_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                m = country_re.search(line)
+                if m:
+                    code = m.group(1).upper()
+                    # Filter out non-country-like codes (numeric, common false positives)
+                    if code.isalpha() and len(code) == 2:
+                        country_counts[code] = country_counts.get(code, 0) + 1
+    except Exception:
+        pass
+
+    # Sort by count descending, take top N
+    sorted_countries = sorted(country_counts.items(), key=lambda x: x[1], reverse=True)[:top_n]
+    return [{"code": code, "count": cnt, "flag": ""} for code, cnt in sorted_countries]
 
 
 def main() -> None:
@@ -212,45 +270,48 @@ def main() -> None:
         "sub_bs.txt",
         "Scarlet Devil | Nightbird (БС)",
     )
-    merge_subscription_files(
+    stats["chs_count"] = merge_subscription_files(
         "shards_temp/shard-data-*/sub_chs_*.txt",
         "sub_chs.txt",
         "Scarlet Devil | Vampire Dash (ЧС)",
     )
-    merge_subscription_files(
+    stats["ru_count"] = merge_subscription_files(
         "shards_temp/shard-data-*/sub_ru_*.txt",
         "sub_ru.txt",
         "Scarlet Devil | Remilia (RU-verified)",
     )
-    merge_subscription_files(
+    stats["vless_count"] = merge_subscription_files(
         "shards_temp/shard-data-*/sub_vless_*.txt",
         "sub_vless.txt",
         "Scarlet Devil | VLESS",
     )
-    merge_subscription_files(
+    stats["vmess_count"] = merge_subscription_files(
         "shards_temp/shard-data-*/sub_vmess_*.txt",
         "sub_vmess.txt",
         "Scarlet Devil | VMess",
     )
-    merge_subscription_files(
+    stats["trojan_count"] = merge_subscription_files(
         "shards_temp/shard-data-*/sub_trojan_*.txt",
         "sub_trojan.txt",
         "Scarlet Devil | Trojan",
     )
-    merge_subscription_files(
+    stats["ss_count"] = merge_subscription_files(
         "shards_temp/shard-data-*/sub_ss_*.txt",
         "sub_ss.txt",
         "Scarlet Devil | Shadowsocks",
     )
-    merge_subscription_files(
+    stats["hy2_count"] = merge_subscription_files(
         "shards_temp/shard-data-*/sub_hy2_*.txt",
         "sub_hy2.txt",
         "Scarlet Devil | Hysteria2",
     )
+
+    # Build country distribution from the merged all-subscriptions file
+    stats["country_stats"] = _extract_country_stats("sub_all.txt")
     GHA.endgroup()
 
     GHA.group("③ BUILD — Compiling Dashboard (index.html)")
-    build_html(stats["unique_alive"], stats["top_speed"])
+    build_html(stats["unique_alive"], stats["top_speed"], stats)
     GHA.endgroup()
 
     GHA.group("④ NOTIFY — Sending Telegram Report")

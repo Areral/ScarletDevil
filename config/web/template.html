@@ -64,6 +64,18 @@
             <span class="nav-label">Контакты</span>
             <div class="nav-dot"></div>
         </button>
+        <button class="nav-btn" data-target="faq" aria-label="Перейти к секции FAQ">
+            <span class="nav-label">FAQ</span>
+            <div class="nav-dot"></div>
+        </button>
+        <button class="nav-btn" data-target="stats" aria-label="Перейти к секции Статистика">
+            <span class="nav-label">Статистика</span>
+            <div class="nav-dot"></div>
+        </button>
+        <button class="nav-btn" data-target="protocols" aria-label="Перейти к секции Протоколы">
+            <span class="nav-label">Протоколы</span>
+            <div class="nav-dot"></div>
+        </button>
     </nav>
 
     <!-- ИНТЕРАКТИВНАЯ ПАНЕЛЬ ЭФФЕКТОВ -->
@@ -102,6 +114,9 @@
                 <button class="mobile-nav-link" data-target="theory_bs" aria-label="Перейти к разделу БС vs ЧС">БС vs ЧС</button>
                 <button class="mobile-nav-link" data-target="theory_isp" aria-label="Перейти к разделу Приватность">Приватность</button>
                 <button class="mobile-nav-link" data-target="contacts" aria-label="Перейти к разделу Контакты">Контакты</button>
+                <button class="mobile-nav-link" data-target="faq" aria-label="Перейти к разделу FAQ">FAQ</button>
+                <button class="mobile-nav-link" data-target="stats" aria-label="Перейти к разделу Статистика">Статистика</button>
+                <button class="mobile-nav-link" data-target="protocols" aria-label="Перейти к разделу Протоколы">Протоколы</button>
             </div>
             <div class="mobile-nav-fun">
                 <span class="mobile-nav-fun-label">Эффекты</span>
@@ -312,6 +327,412 @@
                     <a href="https://t.me/ScDevNetwork" target="_blank" rel="noopener noreferrer" class="btn-primary" style="margin-top: 15px;">
                         <i class="fa-solid fa-paper-plane"></i> Перейти в Telegram
                     </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section id="faq" class="content-section reveal">
+            <div class="glass-card">
+                <h2><i class="fa-solid fa-circle-question" style="color: var(--touhou-purple);"></i> Часто задаваемые вопросы</h2>
+                <div class="text-block">
+                    <div class="faq-list">
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Что такое Scarlet Devil Network?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p>Scarlet Devil Network — это независимый автоматизированный агрегатор и верификатор публичных VPN-конфигураций. Проект собирает десятки тысяч узлов из открытых источников, проверяет их работоспособность через многоступенчатую систему тестов (L4 TCP-connect + L7 HTTP-запрос + замер пропускной способности) и публикует только те, что гарантированно проходят проверку.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Как работает многоступенчатая проверка узлов?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p>Проверка происходит в три этапа:</p>
+                                <ol>
+                                    <li><b>L4 TCP Connect</b> — попытка установить TCP-соединение с сервером. Отсеивает до 70% нерабочих узлов.</li>
+                                    <li><b>L7 HTTP Request</b> — запрос через прокси-туннель с использованием <code>sing-box</code>. Проверяет, что узел действительно проксирует трафик, а не просто отвечает на TCP.</li>
+                                    <li><b>Speed Test</b> — загрузка 50MB чанка для измерения реальной пропускной способности канала.</li>
+                                </ol>
+                                <p>Каждые несколько часов цикл повторяется, и подписки обновляются.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Чем отличаются подписки БС и ЧС?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p><b>БС (Белые Списки)</b> — для сетей с жёсткими ограничениями (мобильный интернет в регионах с тотальной фильтрацией). Используются только <code>VLESS Reality</code> узлы, трафик которых неотличим от обычного HTTPS.</p>
+                                <p><b>ЧС (Чёрные Списки)</b> — для стандартных сетей, где заблокированы только определённые ресурсы. Включают <code>Hysteria2</code>, <code>Shadowsocks</code>, <code>VMess</code> — приоритет на максимальную скорость.</p>
+                                <p><b>MIX (Gungnir)</b> — все живые узлы без фильтрации. Идеально для десктопных клиентов с авто-тестом задержки.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Как часто обновляются конфигурации?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p>Полный цикл сбора и верификации запускается каждые 4–6 часов. Публичные серверы нестабильны по природе — среднее время жизни узла от нескольких часов до пары дней. Мы рекомендуем настроить <b>автообновление подписки</b> в вашем клиенте с интервалом 4–6 часов, чтобы всегда иметь актуальный список рабочих серверов.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Как выбрать подходящий клиент для моего устройства?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p>Выбор клиента зависит от платформы и протокола:</p>
+                                <ul>
+                                    <li><b>Windows:</b> NekoRay, FlClash, Mihomo — для продвинутых; Nekoray/Throne для новичков.</li>
+                                    <li><b>Android:</b> v2rayNG (базовый), SagerNet (продвинутый), FoXray (максимум возможностей).</li>
+                                    <li><b>iOS:</b> Shadowrocket, Streisand, Stash — на выбор.</li>
+                                    <li><b>Роутер:</b> Sing-box CLI на OpenWRT, MikroTik с WireGuard-конфигурацией.</li>
+                                </ul>
+                                <p>Перейдите в раздел <b>«Гайд»</b> на главной странице — там подобраны приложения под каждую платформу.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Нужно ли включать «Allow Insecure» в настройках клиента?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p><b>Да, рекомендуется.</b> Многие рабочие серверы используют самоподписанные SSL-сертификаты. Без опции «Разрешить небезопасные» (Allow Insecure / Skip Certificate Verify) клиент будет обрывать соединение с такими серверами, и вы потеряете значительную часть доступных узлов.</p>
+                                <p>Эта настройка безопасна в контексте VPN-подключения, так как шифрование трафика происходит на уровне протокола (VLESS/VMess/Trojan), а не на уровне TLS-сертификата.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Почему некоторые узлы не работают у меня, но работают у других?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p>На доступность узла влияет множество факторов:</p>
+                                <ul>
+                                    <li><b>Провайдер:</b> Разные операторы блокируют разные IP-диапазоны. То, что работает на одном провайдере, может быть заблокировано на другом.</li>
+                                    <li><b>Регион:</b> В разных регионах РФ применяются разные политики фильтрации (ТСПУ).</li>
+                                    <li><b>Время суток:</b> Нагрузка на сервер и активность DPI варьируются.</li>
+                                    <li><b>Версия клиента:</b> Устаревшие версии могут не поддерживать новые протоколы (XHTTP, Reality).</li>
+                                </ul>
+                                <p><b>Решение:</b> используйте автообновление подписки и запускайте тест задержки в вашем клиенте — он покажет, какие узлы доступны именно для вас.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Как настроить автообновление подписки?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p>В большинстве клиентов:</p>
+                                <ol>
+                                    <li>Перейдите в настройки подписки (обычно: Профили → Подписки → ваша подписка).</li>
+                                    <li>Найдите параметр «Автообновление» или «Update Interval».</li>
+                                    <li>Установите интервал <b>4–6 часов</b> (240–360 минут).</li>
+                                    <li>Убедитесь, что опция «Обновлять при запуске» включена.</li>
+                                </ol>
+                                <p>Клиенты, которые точно поддерживают автообновление: v2rayNG, NekoBox, NekoRay, Shadowrocket, Streisand, FoXray, Stash.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Безопасно ли использовать публичные конфигурации?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p>Публичные конфигурации — это компромисс между доступностью и риском. Основные правила безопасности:</p>
+                                <ul>
+                                    <li><b>Не передавайте конфиденциальные данные</b> (пароли, банковские данные) через незнакомые серверы.</li>
+                                    <li>Используйте <b>HTTPS-сайты</b> — они обеспечивают end-to-end шифрование даже через чужой сервер.</li>
+                                    <li>Включайте <b>DNS-over-HTTPS</b> в браузере, чтобы провайдер и владелец сервера не видели ваши DNS-запросы.</li>
+                                    <li>Для максимальной безопасности рассмотрите <b>аренду собственного VPS</b> с настроенным VLESS Reality — это стоит от 300₽/мес.</li>
+                                </ul>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Чем VLESS Reality отличается от обычного VLESS?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p><b>VLESS Reality</b> — это усовершенствованная версия протокола VLESS с технологией XTLS-Vision:</p>
+                                <ul>
+                                    <li><b>Маскировка под реальный сайт:</b> Трафик мимикрирует под соединение с выбранным легальным сайтом (например, microsoft.com или apple.com). DPI видит обычный HTTPS.</li>
+                                    <li><b>XTLS-Vision:</b> Оптимизация TLS-трафика — снижает накладные расходы и повышает скорость по сравнению с обычным проксированием.</li>
+                                    <li><b>Безопасность:</b> Не требует отдельного TLS-сертификата, так как использует сертификат целевого сайта (steal-from-self).</li>
+                                </ul>
+                                <p>Reality — текущий золотой стандарт обфускации для обхода DPI в РФ.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Можно ли использовать эти конфигурации на роутере?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p><b>Да.</b> Поддерживаются две основные платформы:</p>
+                                <ul>
+                                    <li><b>OpenWRT:</b> Установите <code>sing-box</code> или <code>Mihomo (Clash Meta)</code> через менеджер пакетов. Импортируйте подписку по URL — все устройства в домашней сети получат доступ.</li>
+                                    <li><b>MikroTik (RouterOS):</b> Настройте WireGuard-туннель через наш скрипт (см. вкладку Router в разделе Гайд) или используйте контейнерную среду RouterOS 7.x.</li>
+                                </ul>
+                                <p>Роутерное решение удобно тем, что защищает всю домашнюю сеть без настройки каждого устройства по отдельности.</p>
+                            </div>
+                        </details>
+
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span class="faq-q-mark"><i class="fa-solid fa-q"></i></span>
+                                Что делать, если провайдер блокирует все подключения?
+                                <i class="fa-solid fa-chevron-down faq-arrow"></i>
+                            </summary>
+                            <div class="faq-answer">
+                                <p>Если ни одно подключение не работает:</p>
+                                <ol>
+                                    <li><b>Проверьте базовую связность:</b> Откройте Яндекс или Госуслуги. Если они тоже недоступны — проблема на стороне провайдера (физический обрыв), а не блокировки.</li>
+                                    <li><b>Попробуйте разные протоколы:</b> Начните с VLESS Reality (максимальная обфускация), затем попробуйте Hysteria2 (QUIC, трудно блокировать).</li>
+                                    <li><b>Смените DNS:</b> Возможно, провайдер блокирует DNS-резолвинг. Настройте DNS-over-HTTPS (Quad9, Cloudflare).</li>
+                                    <li><b>Попробуйте другого оператора:</b> Некоторые мобильные операторы применяют более агрессивную фильтрацию. Переключитесь на другого провайдера для сравнения.</li>
+                                    <li><b>Используйте прокси-цепочку:</b> Настройте цепочку из двух узлов (chain proxy) — это усложняет анализ трафика для DPI.</li>
+                                </ol>
+                            </div>
+                        </details>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STATISTICS -->
+        <section id="stats" class="content-section reveal">
+            <div class="glass-card">
+                <h2><i class="fa-solid fa-chart-pie" style="color: var(--touhou-sakura);"></i> Статистика сети</h2>
+                <div class="text-block">
+                    <p>Актуальная статистика собранных и проверенных узлов. Данные обновляются каждые 4–6 часов вместе с подписками.</p>
+                </div>
+
+                <!-- Stats data from merge.py -->
+                <div id="stats-data"
+                     data-bs-count="{{BS_COUNT}}"
+                     data-chs-count="{{CHS_COUNT}}"
+                     data-ru-count="{{RU_COUNT}}"
+                     data-vless-count="{{VLESS_COUNT}}"
+                     data-vmess-count="{{VMESS_COUNT}}"
+                     data-trojan-count="{{TROJAN_COUNT}}"
+                     data-ss-count="{{SS_COUNT}}"
+                     data-hy2-count="{{HY2_COUNT}}"
+                     data-max-speed="{{MAX_SPEED}}"
+                     data-total-nodes="{{PROXY_COUNT}}"
+                     data-country-stats='{{COUNTRY_STATS_JSON}}'
+                     data-node-stats='{{NODE_STATS_JSON}}'
+                     style="display:none;">
+                </div>
+
+                <div class="stats-grid">
+                    <!-- Protocol Distribution -->
+                    <div class="stats-card">
+                        <h3 class="stats-card-title"><i class="fa-solid fa-code-branch" style="color: var(--touhou-purple);"></i> Распределение по протоколам</h3>
+                        <div class="chart-bars" id="protocol-chart">
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">VLESS</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-vless" id="bar-vless"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-vless">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">VMess</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-vmess" id="bar-vmess"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-vmess">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Trojan</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-trojan" id="bar-trojan"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-trojan">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Shadowsocks</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-ss" id="bar-ss"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-ss">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Hysteria2</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-hy2" id="bar-hy2"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-hy2">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Class Distribution -->
+                    <div class="stats-card">
+                        <h3 class="stats-card-title"><i class="fa-solid fa-layer-group" style="color: var(--accent);"></i> Распределение по классам</h3>
+                        <div class="chart-bars" id="class-chart">
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Nightbird (БС)</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-bs" id="bar-bs"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-bs">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Vampire Dash (ЧС)</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-chs" id="bar-chs"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-chs">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Remilia (RU)</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-ru" id="bar-ru"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-ru">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Country Distribution -->
+                    <div class="stats-card stats-wide">
+                        <h3 class="stats-card-title"><i class="fa-solid fa-globe" style="color: var(--cyber-blue);"></i> Топ-10 стран по количеству узлов</h3>
+                        <div class="chart-bars" id="country-chart">
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">—</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-country" style="width: 0%;"></div>
+                                </div>
+                                <span class="chart-bar-value">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Speed Summary -->
+                    <div class="stats-card">
+                        <h3 class="stats-card-title"><i class="fa-solid fa-gauge-high" style="color: var(--cyber-green);"></i> Сводка по скорости</h3>
+                        <div class="stats-summary" id="speed-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Макс. скорость</span>
+                                <span class="summary-value text-touhou" id="sum-max-speed">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Всего живых узлов</span>
+                                <span class="summary-value" id="sum-total">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">BS узлов (Reality)</span>
+                                <span class="summary-value" style="color: #c4b5fd;" id="sum-bs">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PROTOCOL COMPARISON -->
+        <section id="protocols" class="content-section reveal">
+            <div class="glass-card">
+                <h2><i class="fa-solid fa-scale-balanced" style="color: var(--accent);"></i> Сравнение протоколов</h2>
+                <div class="text-block">
+                    <p>Каждый протокол имеет свои сильные и слабые стороны. Выберите подходящий под вашу сеть и задачи.</p>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="cyber-table protocol-table">
+                        <thead>
+                            <tr>
+                                <th>Протокол</th>
+                                <th>Скорость</th>
+                                <th>Обфускация</th>
+                                <th>Стабильность</th>
+                                <th>Рекомендация</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-vless">VLESS Reality</span>
+                                    <span class="proto-sub">XTLS-Vision + REALITY</span>
+                                </td>
+                                <td><span class="rating rating-high">★★★★☆</span></td>
+                                <td><span class="rating rating-max">★★★★★</span><br><span class="rating-detail">Полная маскировка под реальный HTTPS-сайт</span></td>
+                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Высокая, особенно на выделенных серверах</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-best">Лучший для БС</span><br><span class="rec-detail">Идеален для жёстких блокировок. Единственный протокол для мобильных сетей с тотальной фильтрацией.</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-vmess">VMess</span>
+                                    <span class="proto-sub">WebSocket / gRPC / TCP</span>
+                                </td>
+                                <td><span class="rating rating-mid">★★★☆☆</span></td>
+                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">Базовая обфускация через WebSocket</span></td>
+                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Широкая поддержка клиентами</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-good">Универсальный</span><br><span class="rec-detail">Хорош для повседневного использования. Совместим практически со всеми клиентами.</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-trojan">Trojan</span>
+                                    <span class="proto-sub">TLS + WebSocket</span>
+                                </td>
+                                <td><span class="rating rating-high">★★★★☆</span></td>
+                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Миникрия под HTTPS, TLS-сертификат</span></td>
+                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Проверенный, зрелый протокол</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-good">Надёжный</span><br><span class="rec-detail">Стабильный выбор. Работает на большинстве сетей, простая настройка.</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-ss">Shadowsocks</span>
+                                    <span class="proto-sub">AEAD-шифры (2022)</span>
+                                </td>
+                                <td><span class="rating rating-max">★★★★★</span></td>
+                                <td><span class="rating rating-low">★★☆☆☆</span><br><span class="rating-detail">Без маскировки, легко детектируется</span></td>
+                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">Зависит от провайдера</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-niche">Нишевый</span><br><span class="rec-detail">Максимальная скорость для стриминга. Только для сетей без глубокой инспекции трафика.</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-hy2">Hysteria2</span>
+                                    <span class="proto-sub">QUIC (UDP) + Brutal</span>
+                                </td>
+                                <td><span class="rating rating-max">★★★★★</span></td>
+                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">QUIC-трафик маскируется, но UDP заметен</span></td>
+                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">Чувствителен к потере пакетов</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-speed">Скорость</span><br><span class="rec-detail">Лучший для видео 4K и больших загрузок на стабильных сетях. Не для жёсткого DPI.</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>

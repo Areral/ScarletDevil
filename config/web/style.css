@@ -1256,3 +1256,310 @@ section:last-of-type { border-bottom: none; }
     --theme-accent-secondary: var(--touhou-purple);
     --theme-text-accent: var(--touhou-sakura);
 }
+
+/* ═══════════════════════════════════════════════
+   US-W07 — FAQ, STATS, PROTOCOL COMPARISON
+   ═══════════════════════════════════════════════ */
+
+/* --- FAQ ACCORDION --- */
+.faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.faq-item {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: var(--trans);
+}
+.faq-item[open] {
+    border-color: var(--border-light);
+    background: rgba(225, 29, 72, 0.03);
+}
+
+.faq-question {
+    padding: 18px 20px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    user-select: none;
+    list-style: none;
+    transition: var(--trans-fast);
+}
+.faq-question::-webkit-details-marker { display: none; }
+.faq-question::marker { display: none; content: ''; }
+
+.faq-q-mark {
+    width: 28px; height: 28px;
+    min-width: 28px;
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: var(--touhou-purple);
+    transition: var(--trans-fast);
+}
+.faq-item[open] .faq-q-mark {
+    background: rgba(139, 92, 246, 0.25);
+    color: var(--touhou-purple-glow);
+}
+
+.faq-arrow {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: var(--text-dark);
+    transition: transform 0.3s ease;
+    flex-shrink: 0;
+}
+.faq-item[open] .faq-arrow {
+    transform: rotate(180deg);
+    color: var(--touhou-purple);
+}
+
+.faq-answer {
+    padding: 0 20px 20px 60px;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    line-height: 1.7;
+}
+.faq-answer p { margin-bottom: 12px; }
+.faq-answer p:last-child { margin-bottom: 0; }
+.faq-answer b, .faq-answer strong { color: #fff; }
+.faq-answer code {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    color: var(--cyber-blue);
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+}
+.faq-answer ul, .faq-answer ol {
+    padding-left: 20px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.faq-answer li::marker { color: var(--touhou-red); font-weight: 900; }
+
+@media (max-width: 600px) {
+    .faq-question { padding: 14px 16px; font-size: 0.88rem; }
+    .faq-answer { padding: 0 16px 16px 48px; font-size: 0.84rem; }
+}
+
+/* --- STATS GRID --- */
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    margin-top: 24px;
+}
+@media (min-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+.stats-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    transition: var(--trans);
+}
+.stats-card:hover {
+    border-color: rgba(225, 29, 72, 0.15);
+    background: rgba(0, 0, 0, 0.35);
+}
+.stats-wide {
+    grid-column: 1 / -1;
+}
+.stats-card-title {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* --- CHART BARS --- */
+.chart-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.chart-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.chart-bar-label {
+    width: 110px;
+    min-width: 110px;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    text-align: right;
+    font-weight: 700;
+}
+.chart-bar-track {
+    flex: 1;
+    height: 22px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 11px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.chart-bar-fill {
+    height: 100%;
+    border-radius: 11px;
+    min-width: 4px;
+    transition: width 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: relative;
+}
+.chart-bar-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15));
+    border-radius: 11px;
+}
+.chart-bar-value {
+    width: 50px;
+    min-width: 50px;
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-main);
+    font-weight: 700;
+    text-align: left;
+}
+
+/* Protocol bar colors */
+.bar-vless { background: linear-gradient(90deg, rgba(139, 92, 246, 0.4), var(--touhou-purple)); }
+.bar-vmess { background: linear-gradient(90deg, rgba(56, 189, 248, 0.4), var(--cyber-blue)); }
+.bar-trojan { background: linear-gradient(90deg, rgba(250, 204, 21, 0.4), #facc15); }
+.bar-ss { background: linear-gradient(90deg, rgba(16, 185, 129, 0.4), var(--cyber-green)); }
+.bar-hy2 { background: linear-gradient(90deg, rgba(244, 114, 182, 0.4), var(--touhou-sakura)); }
+
+/* Class bar colors */
+.bar-bs { background: linear-gradient(90deg, rgba(139, 92, 246, 0.4), #c4b5fd); }
+.bar-chs { background: linear-gradient(90deg, rgba(16, 185, 129, 0.4), #6ee7b7); }
+.bar-ru { background: linear-gradient(90deg, rgba(250, 204, 21, 0.4), #fbbf24); }
+
+/* Country bar color */
+.bar-country { background: linear-gradient(90deg, rgba(56, 189, 248, 0.4), var(--cyber-blue)); }
+
+@media (max-width: 500px) {
+    .chart-bar-label { width: 80px; min-width: 80px; font-size: 0.68rem; }
+    .chart-bar-value { width: 40px; min-width: 40px; font-size: 0.7rem; }
+    .chart-bar-row { gap: 8px; }
+}
+
+/* --- STATS SUMMARY --- */
+.stats-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+.summary-label {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+.summary-value {
+    font-size: 1.3rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    color: var(--text-main);
+}
+
+/* --- PROTOCOL COMPARISON TABLE --- */
+.protocol-table {
+    min-width: 700px;
+}
+.protocol-table td {
+    font-size: 0.85rem;
+    vertical-align: middle;
+}
+.proto-label {
+    display: block;
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: #fff;
+    margin-bottom: 4px;
+}
+.proto-sub {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dark);
+    letter-spacing: 0.3px;
+}
+.proto-vless { color: #c4b5fd; }
+.proto-vmess { color: #7dd3fc; }
+.proto-trojan { color: #fde047; }
+.proto-ss { color: #6ee7b7; }
+.proto-hy2 { color: #f9a8d4; }
+
+.rating {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+}
+.rating-max { color: #6ee7b7; }
+.rating-high { color: #a3e635; }
+.rating-mid { color: #facc15; }
+.rating-low { color: #f87171; }
+.rating-detail {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-dark);
+    margin-top: 3px;
+    line-height: 1.4;
+}
+.rec-cell {
+    min-width: 180px;
+}
+.rec-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+}
+.rec-best { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+.rec-good { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.25); }
+.rec-niche { background: rgba(250, 204, 21, 0.12); color: #fde047; border: 1px solid rgba(250, 204, 21, 0.2); }
+.rec-speed { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.25); }
+.rec-detail {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+}

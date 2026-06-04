@@ -191,3 +191,42 @@ Branch: ralph/website-overhaul
   - `saveFXStates()` helper called after every effect toggle keeps localStorage in sync. JSON.parse with fallback `{}` on init prevents errors from corrupted storage
 ---
 
+## 2026-06-04 - US-W07
+- **What was implemented:**
+  - **FAQ section:** 12 вопросов-ответов с использованием нативного HTML `<details>/<summary>` accordion паттерна. Каждый вопрос имеет иконку Q и анимированную стрелку. Охвачены: что такое проект, как работает проверка, БС/ЧС отличия, обновление, выбор клиента, Allow Insecure, неработающие узлы, автообновление, безопасность, VLESS Reality vs обычный, роутеры, полная блокировка.
+  - **Stats section:** CSS bar-charts для распределения по протоколам (VLESS/VMess/Trojan/SS/HY2), по классам (BS/CHS/RU), top-10 стран по количеству узлов, сводка скорости. Все данные рендерятся из data-атрибутов заполняемых merge.py.
+  - **Protocol Comparison section:** Таблица сравнения 5 протоколов по критериям: скорость, обфускация, стабильность, рекомендация. С цветовыми rating-звёздами и рекомендательными бейджами.
+  - **merge.py build_html():** Обновлён для приёма stats dict с 8 счётчиками (bs/chs/ru/vless/vmess/trojan/ss/hy2_count) и country_stats JSON. Добавлены замены для 8 новых плейсхолдеров + {{COUNTRY_STATS_JSON}}.
+  - **merge.py main():** Захват всех return-значений merge_subscription_files() для подсчёта протоколов. Добавлена `_extract_country_stats()` — извлечение 2-буквенных кодов стран из #фрагментов подписных URL, top-10 сортировка.
+  - **Navigation:** 3 новых пункта в боковой навигации (faq, stats, protocols) и в мобильном меню.
+- **Files changed:** config/web/template.html, config/web/style.css, config/web/main.js, merge.py, prd.json, progress.txt
+- **Learnings for future iterations:**
+  - `<details>/<summary>` — нативный HTML accordion без JS. Стилизация через `::-webkit-details-marker { display: none }` и `::marker { display: none; content: '' }`. Анимация стрелки через `[open] .arrow { transform: rotate(180deg) }`.
+  - CSS bar-чарты: `chart-bar-fill` с процентной шириной внутри `chart-bar-track`. Градиентная заливка + `::after` с белым полупрозрачным overlay для глянца. Переход `width 1s cubic-bezier(0.2, 0.8, 0.2, 1)` даёт плавную анимацию при загрузке.
+  - Статистика стран извлекается из `#FRAGMENT` подписных URL через regex `#(\w{2})[\s\-_]`. Не все узлы имеют страновую метку — это best-effort извлечение.
+  - `merge_subscription_files()` уже возвращает int (количество узлов) — достаточно было просто захватить return values вместо добавления новых вызовов.
+  - Статистическая сетка использует `grid-template-columns: 1fr 1fr` на ≥768px с `stats-wide` (grid-column: 1 / -1) для страны на всю ширину.
+  - Все 8 новых плейсхолдеров + {{COUNTRY_STATS_JSON}} добавлены в build_html(). {{SUB_LINK}} отсутствует (удалён в US-W05), что подтверждено проверкой.
+  - Таблица протоколов переиспользует существующие `.cyber-table` и `.table-responsive` классы, добавляя только `.protocol-table` для кастомизации ячеек.
+---
+
+## 2026-06-04 - US-W08
+- **What was implemented:**
+  - Большинство критериев US-W08 уже было выполнено предыдущими историями (US-W01: протокольные файлы в exporter/merge + удаление sorted(); US-W07: 8 счётчиков статистики + {{COUNTRY_STATS_JSON}} в build_html). Эта итерация закрыла последний пробел AC #3 — плейсхолдер `{{NODE_STATS_JSON}}`.
+  - **merge.py build_html():** Добавлен консолидированный `node_stats` dict (total, max_speed, bs/chs/ru/vless/vmess/trojan/ss/hy2, countries) → `node_stats_json`, подставляется в новый плейсхолдер `{{NODE_STATS_JSON}}`. Единый источник правды для клиентских графиков.
+  - **template.html:** Добавлен атрибут `data-node-stats='{{NODE_STATS_JSON}}'` в `#stats-data` div (рядом с существующими data-*-count и data-country-stats).
+  - **main.js initStats():** Теперь предпочитает blob `data-node-stats` (через хелпер `attr(name, key)`), с fallback на отдельные data-атрибуты при отсутствии/повреждении JSON. Аналогично для country distribution (node.countries → data-country-stats) и speed summary (node.max_speed/total → data-атрибуты).
+  - **Прочие AC уже выполнены:** UTF-8 + #profile-title/#profile-update-interval (merge_subscription_files), пустые файлы не ломают сборку (пустой unique_map → только заголовки; generate_subscription([]) → только заголовки), порядок по скорости через dict вместо sorted().
+- **Files changed:** merge.py, config/web/template.html, config/web/main.js
+- **Also committed (leftover from prior sessions):** config/web/style.css (US-W07 FAQ/stats/protocol CSS не был закоммичен в US-W07), prd.json (US-W07 passes:true флаг)
+- **Verification:**
+  - `python -m py_compile merge.py core/exporter.py core/models.py` — OK
+  - `node --check config/web/main.js` — OK
+  - Smoke-test build_html() (со stubbed CONFIG): нет остаточных `{{...}}` плейсхолдеров, `data-node-stats` парсится в валидный JSON с верными счётчиками, пустой stats={} не падает
+- **Learnings for future iterations:**
+  - `pydantic_settings` и `aiohttp`/`loguru` отсутствуют в локальном окружении — для smoke-теста merge.py нужно стабить `core.settings.CONFIG`, `core.logger.GHA`, `loguru.logger` через `sys.modules` перед `importlib.util.exec_module`.
+  - **Gotcha:** AC использовал имя `{{NODE_STATS_JSON}}`, но прежняя реализация (US-W07) уже завезла `{{COUNTRY_STATS_JSON}}` + индивидуальные data-атрибуты. Решение: добавить `{{NODE_STATS_JSON}}` как консолидированный blob, сохранив обратную совместимость с data-атрибутами (JS читает blob с fallback). Не ломать существующий рабочий путь рендеринга.
+  - **Gotcha:** `index.html` — это собираемый артефакт (tracked, но регенерируется CI). НЕ коммитить локально сгенерированный index.html: после ручного запуска build_html всегда `git checkout -- index.html`.
+  - Паттерн «blob + fallback»: единый JSON-плейсхолдер как источник правды, индивидуальные data-атрибуты как резерв — даёт и чистый контракт (AC), и устойчивость рендеринга если blob повреждён.
+---
+

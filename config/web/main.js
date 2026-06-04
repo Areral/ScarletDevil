@@ -964,6 +964,7 @@ function init() {
     initFXControl();
     initTypewriter();
     initStarDust();
+    initStats();
 }
 
 function switchPlatform(platform) {
@@ -1654,6 +1655,109 @@ function stopStardust() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     stardustParticles = [];
+}
+
+// --- STATISTICS CHARTS (US-W07) ---
+function initStats() {
+    var statsData = document.getElementById('stats-data');
+    if (!statsData) return;
+
+    // Prefer the consolidated node-stats blob; fall back to individual
+    // data attributes if it is absent or malformed.
+    var node = null;
+    var nodeJson = statsData.getAttribute('data-node-stats');
+    if (nodeJson) {
+        try { node = JSON.parse(nodeJson); } catch (e) { node = null; }
+    }
+    function attr(name, key) {
+        if (node && typeof node[key] === 'number') return node[key];
+        return parseInt(statsData.getAttribute(name)) || 0;
+    }
+
+    var total = attr('data-total-nodes', 'total');
+    if (total === 0) return;
+
+    // Max value for bar scaling (find the maximum across all counts)
+    var counts = {
+        vless:  attr('data-vless-count', 'vless'),
+        vmess:  attr('data-vmess-count', 'vmess'),
+        trojan: attr('data-trojan-count', 'trojan'),
+        ss:     attr('data-ss-count', 'ss'),
+        hy2:    attr('data-hy2-count', 'hy2'),
+        bs:     attr('data-bs-count', 'bs'),
+        chs:    attr('data-chs-count', 'chs'),
+        ru:     attr('data-ru-count', 'ru')
+    };
+
+    var maxCount = Math.max(counts.vless, counts.vmess, counts.trojan, counts.ss, counts.hy2, 1);
+
+    // Render protocol bars
+    function setBar(id, val) {
+        var bar = document.getElementById(id);
+        var valEl = document.getElementById('val-' + id.split('-')[1]);
+        if (bar) bar.style.width = (val / maxCount * 100) + '%';
+        if (valEl) valEl.textContent = val;
+    }
+    setBar('bar-vless', counts.vless);
+    setBar('bar-vmess', counts.vmess);
+    setBar('bar-trojan', counts.trojan);
+    setBar('bar-ss', counts.ss);
+    setBar('bar-hy2', counts.hy2);
+
+    // Render class bars
+    var maxClass = Math.max(counts.bs, counts.chs, counts.ru, 1);
+    function setClassBar(id, val) {
+        var bar = document.getElementById(id);
+        var valEl = document.getElementById('val-' + id.split('-')[1]);
+        if (bar) bar.style.width = (val / maxClass * 100) + '%';
+        if (valEl) valEl.textContent = val;
+    }
+    setClassBar('bar-bs', counts.bs);
+    setClassBar('bar-chs', counts.chs);
+    setClassBar('bar-ru', counts.ru);
+
+    // Render country distribution
+    var countryStats = (node && Array.isArray(node.countries)) ? node.countries : null;
+    if (!countryStats) {
+        var countryJson = statsData.getAttribute('data-country-stats');
+        if (countryJson) {
+            try { countryStats = JSON.parse(countryJson); } catch(e) { countryStats = null; }
+        }
+    }
+    if (countryStats) {
+        try {
+            var countryChart = document.getElementById('country-chart');
+            if (countryChart && countryStats.length > 0) {
+                var maxCountry = countryStats[0].count || 1;
+                var html = '';
+                countryStats.forEach(function(c) {
+                    var pct = (c.count / maxCountry * 100);
+                    html += '<div class="chart-bar-row">' +
+                        '<span class="chart-bar-label">' + (c.flag || '') + ' ' + (c.code || '??') + '</span>' +
+                        '<div class="chart-bar-track">' +
+                            '<div class="chart-bar-fill bar-country" style="width:' + pct + '%;"></div>' +
+                        '</div>' +
+                        '<span class="chart-bar-value">' + c.count + '</span>' +
+                    '</div>';
+                });
+                countryChart.innerHTML = html;
+            }
+        } catch(e) {
+            // If rendering fails, leave the placeholder
+        }
+    }
+
+    // Render speed summary
+    var maxSpeed = (node && typeof node.max_speed === 'number')
+        ? node.max_speed : (statsData.getAttribute('data-max-speed') || '—');
+    var totalNodes = (node && typeof node.total === 'number')
+        ? node.total : (statsData.getAttribute('data-total-nodes') || '—');
+    var sumMax = document.getElementById('sum-max-speed');
+    var sumTotal = document.getElementById('sum-total');
+    var sumBS = document.getElementById('sum-bs');
+    if (sumMax) sumMax.textContent = maxSpeed + ' Mbps';
+    if (sumTotal) sumTotal.textContent = totalNodes;
+    if (sumBS) sumBS.textContent = counts.bs;
 }
 
 init();
