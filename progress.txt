@@ -89,3 +89,36 @@ Started: Thu Jun  4 04:19:02 RTZ 2026
     not, due to `uuid.uuid4()`).
 ---
 
+## Thu Jun  4 - US-004 (Parse once: NODES_FILE input mode + round-robin sharding)
+- Added NODES_FILE env-var support to main.py (AUDIT §2.1, §2.2).
+- `main.py`:
+  - Added `import json` and `from core.models import ProxyNode`.
+  - When `NODES_FILE` env var is set, loads pre-parsed nodes from that JSON file
+    via `ProxyNode.model_validate(d)` instead of calling `fetch_and_parse()`.
+  - Sharding switched from contiguous slicing (`all_nodes[i*chunk:(i+1)*chunk]`)
+    to round-robin (`all_nodes[shard_index::shard_count]`) for balanced per-drone
+    workloads regardless of source ordering.
+  - Metrics section now uses `source_metrics` dict — populated from
+    `parser.metrics` in normal mode, empty `{}` in NODES_FILE mode (source-level
+    metrics aren't available when loading pre-parsed nodes).
+  - Backwards compatible: when `NODES_FILE` is unset, behavior is identical to
+    before.
+- `parse_only.py`: already existed (untracked); now committed. Runs
+  `RKNValidator.load_lists()` + `LinkParser.fetch_and_parse()` and writes
+  `data/nodes.json` as a list of `model_dump(by_alias=True)` dicts.
+- **Checks:** `python -m py_compile parse_only.py main.py merge.py core/*.py` OK.
+- **Learnings for future iterations:**
+  - The pre-existing `parse_only.py` (untracked) was already written for this
+    story — needed only the main.py side to complete the feature.
+  - `ProxyNode.model_validate(d)` (pydantic v2) reconstructs nodes from
+    `model_dump(by_alias=True)` output correctly, including alias fields like
+    `serviceName` and `aid`.
+  - When splitting the parse/drone pipeline, source-level metrics
+    (`parser.metrics`) aren't available in the drone — `source_metrics` defaults
+    to empty dict so the metrics/dead_sources code still runs without error.
+  - Round-robin slicing: `all_nodes[shard_index::shard_count]` is the idiomatic
+    Python way to interleave shards; it distributes nodes from different sources
+    evenly across drones vs contiguous slicing which groups same-source nodes
+    together.
+---
+
