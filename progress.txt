@@ -244,3 +244,23 @@ Branch: ralph/website-overhaul
   - Vercel header-правило `/(.*sub.*)` покрывает и source-пути `/sub/<proto>`, и destination `sub_<proto>.txt` — отдельные header-блоки для каждого протокола не нужны.
   - Деплой = `git push --force` в той же ветке (не отдельная gh-pages orphan-ветка); add всех артефактов в одном коммите.
 ---
+
+## 2026-06-04 - US-W10
+- **What was implemented:**
+  - **Hero CTA** (template.html): Добавлен `.hero-actions` wrapper с двумя кнопками — существующая «Получить доступ» (btn-primary) + новая «Быстрая настройка» (btn-secondary.btn-wizard → `openWizard()`). Рядом onboarding-подсказка `#wizard-hint-bubble`.
+  - **Wizard modal** (template.html): Новая `#wizard-modal` (modal-wide) с 3 панами: Платформа (`wizard-pane-1`), Клиент (`wizard-pane-2`), Инструкция+Подписка (`wizard-pane-3`). Прогресс-степпер (3 точки + линии), текст «Шаг N/3», навигация Назад/Завершить.
+  - **Wizard JS** (main.js): `PLATFORM_META` (label+icon для 7 платформ), `openWizard/wizardSelectPlatform/wizardSelectApp/goWizardStep/wizardBack/wizardFinish`. Карточки строятся через `makeWizardCard` (role=button, tabindex, Enter/Space). Платформа запоминается в localStorage `sd_wizard_platform`. `wizardFinish()` синхронизирует основной UI (currentPlatform/currentAppId + updateUI) и открывает configs-modal.
+  - **Onboarding** (main.js): `initOnboarding` (вызывается в init()) — при первом визите (`sd_visited` != '1') показывает подсказку через 1.5с, добавляет `pulse-hint` к кнопке, авто-скрытие через 14с. `dismissOnboarding` ставит флаг.
+  - **CSS** (style.css): `.hero-actions`, `.btn-wizard`/`.pulse-hint` (keyframes wizard-pulse), `.onboard-bubble` (всплывающая подсказка со стрелкой), `.wizard-progress`/`.wizard-step-dot`(.active/.done)/`.wizard-step-line`, `.wizard-hint`, `.wizard-final-head`/`.protocol-badges`, `.wizard-guide`, `.wizard-nav`.
+- **Files changed:** config/web/template.html, config/web/main.js, config/web/style.css, prd.json, progress.txt
+- **Verification:**
+  - `node --check config/web/main.js` — OK
+  - `python -m py_compile merge.py core/exporter.py core/models.py` — OK
+  - `grep '{{...}}' template.html` — только известные плейсхолдеры, новых незакрытых нет
+- **Learnings for future iterations:**
+  - JS и HTML части wizard были реализованы в предыдущей (прерванной) сессии и оставались uncommitted; недоставал ТОЛЬКО CSS — всегда проверяй `git status`/`git diff` в начале итерации, чтобы не дублировать готовую работу.
+  - **Reuse:** `app.guide` (HTML гайда) рендерится в `#wizard-guide` как есть — все guide-классы (`.step-list`, `.guide-tip`, `.guide-troubleshoot`, `.guide-config`) глобальны и стилизуются вне `.instruction-box`, так что отдельный CSS для wizard-гайда не нужен.
+  - Wizard переиспользует существующие `.app-card`/`.app-grid`/`.proto-tag` классы — новые карточки выглядят идентично основному UI бесплатно.
+  - openModal/closeModal + Escape/overlay-close (main.js:1066-1094) работают для ЛЮБОЙ `.modal-overlay` по id — новая модалка получает закрытие по Escape/overlay автоматически, без доп. кода.
+---
+

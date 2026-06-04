@@ -1563,3 +1563,70 @@ section:last-of-type { border-bottom: none; }
     color: var(--text-dim);
     line-height: 1.5;
 }
+
+/* --- SETUP WIZARD (US-W10) --- */
+.hero-actions {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: center;
+}
+@media (min-width: 600px) { .hero-actions { justify-content: flex-start; } }
+
+.btn-wizard i { color: var(--touhou-sakura); }
+.btn-wizard.pulse-hint { animation: wizard-pulse 2s ease-in-out infinite; }
+@keyframes wizard-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+    50% { box-shadow: 0 0 0 8px rgba(225, 29, 72, 0.12); border-color: var(--touhou-red); }
+}
+
+/* Onboarding hint bubble */
+.wizard-cta-wrap { position: relative; display: inline-flex; }
+.onboard-bubble {
+    position: absolute; top: calc(100% + 14px); left: 0; z-index: 50;
+    background: var(--bg-card); border: 1px solid var(--touhou-red); border-radius: 12px;
+    padding: 12px 16px; font-size: 0.8rem; color: var(--text-main); line-height: 1.5;
+    max-width: 280px; box-shadow: 0 12px 30px rgba(0,0,0,0.5), 0 0 20px rgba(225, 29, 72, 0.15);
+    opacity: 0; transform: translateY(-8px); pointer-events: none;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.onboard-bubble i { color: var(--touhou-sakura); margin-right: 6px; }
+.onboard-bubble.show { opacity: 1; transform: translateY(0); }
+.onboard-bubble::before {
+    content: ''; position: absolute; bottom: 100%; left: 24px;
+    border: 7px solid transparent; border-bottom-color: var(--touhou-red);
+}
+
+/* Progress stepper */
+.wizard-progress { margin-bottom: 24px; }
+.wizard-steps { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 10px; }
+.wizard-step-dot { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 0 0 auto; }
+.wizard-step-dot span {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(0,0,0,0.4); border: 2px solid var(--border);
+    font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 0.9rem;
+    color: var(--text-dim); transition: var(--trans);
+}
+.wizard-step-dot label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); transition: var(--trans); }
+.wizard-step-dot.active span { border-color: var(--touhou-red); background: rgba(225, 29, 72, 0.15); color: #fff; box-shadow: 0 0 14px rgba(225, 29, 72, 0.3); }
+.wizard-step-dot.active label { color: var(--touhou-sakura); }
+.wizard-step-dot.done span { border-color: var(--touhou-sakura); color: var(--touhou-sakura); }
+.wizard-step-line { flex: 1 1 auto; max-width: 60px; height: 2px; background: var(--border); }
+.wizard-progress-text {
+    text-align: center; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; color: var(--text-dim); letter-spacing: 1px;
+}
+
+/* Panes */
+.wizard-hint { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px; line-height: 1.5; }
+.wizard-platform-grid, .wizard-app-grid { margin-bottom: 0; }
+
+/* Final step */
+.wizard-final-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+.wizard-final-head > i { font-size: 2rem; color: var(--touhou-sakura); }
+.wizard-final-name { font-weight: 800; font-size: 1.2rem; color: #fff; }
+.wizard-final-protos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.protocol-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.wizard-guide { font-size: 0.9rem; line-height: 1.6; }
+
+/* Navigation buttons */
+.wizard-nav { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+.wizard-nav .btn-secondary, .wizard-nav .btn-primary { width: auto; flex: 1 1 auto; max-width: none; }

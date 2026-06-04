@@ -941,6 +941,17 @@ const PLATFORMS = {
     router:['mikrotik', 'openwrt', 'singbox_cli', 'mihomo']
 };
 
+// Platform display metadata for the setup wizard (US-W10)
+const PLATFORM_META = {
+    windows:   { label: 'Windows',    icon: 'fa-brands fa-windows' },
+    android:   { label: 'Android',    icon: 'fa-brands fa-android' },
+    androidtv: { label: 'Android TV', icon: 'fa-solid fa-tv' },
+    ios:       { label: 'iOS',        icon: 'fa-brands fa-apple' },
+    mac:       { label: 'macOS',      icon: 'fa-solid fa-laptop' },
+    linux:     { label: 'Linux',      icon: 'fa-brands fa-linux' },
+    router:    { label: 'Роутер',     icon: 'fa-solid fa-wifi' }
+};
+
 let currentPlatform = 'windows';
 let currentAppId = PLATFORMS['windows'][0];
 
@@ -965,6 +976,7 @@ function init() {
     initTypewriter();
     initStarDust();
     initStats();
+    initOnboarding();
 }
 
 function switchPlatform(platform) {
@@ -1084,6 +1096,168 @@ document.addEventListener('click', function(e) {
 function acceptRules() {
     closeModal('rules-modal');
     setTimeout(() => openModal('configs-modal'), 300);
+}
+
+// --- SETUP WIZARD (US-W10) ---
+let wizardStep = 1;
+let wizardPlatform = null;
+let wizardAppId = null;
+
+function openWizard() {
+    // Restore remembered platform choice
+    wizardPlatform = null;
+    try {
+        const saved = localStorage.getItem('sd_wizard_platform');
+        if (saved && PLATFORMS[saved]) wizardPlatform = saved;
+    } catch (e) {}
+
+    buildWizardPlatforms();
+    if (wizardPlatform) {
+        wizardAppId = PLATFORMS[wizardPlatform][0];
+        buildWizardApps();
+    }
+    goWizardStep(1);
+    openModal('wizard-modal');
+    dismissOnboarding();
+}
+
+function makeWizardCard(icon, label, selected, ariaPrefix, onSelect) {
+    const div = document.createElement('div');
+    div.className = 'app-card' + (selected ? ' selected' : '');
+    div.setAttribute('role', 'button');
+    div.setAttribute('tabindex', '0');
+    div.setAttribute('aria-label', ariaPrefix + ' ' + label);
+    div.innerHTML = '<i class="' + icon + ' app-icon"></i><div class="app-name">' + label + '</div>';
+    div.onclick = onSelect;
+    div.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); div.click(); }
+    });
+    return div;
+}
+
+function buildWizardPlatforms() {
+    const grid = document.getElementById('wizard-platform-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    Object.keys(PLATFORM_META).forEach(function (pid) {
+        const meta = PLATFORM_META[pid];
+        grid.appendChild(makeWizardCard(meta.icon, meta.label, pid === wizardPlatform, 'Платформа', function () {
+            wizardSelectPlatform(pid);
+        }));
+    });
+}
+
+function wizardSelectPlatform(pid) {
+    wizardPlatform = pid;
+    wizardAppId = PLATFORMS[pid][0];
+    try { localStorage.setItem('sd_wizard_platform', pid); } catch (e) {}
+    buildWizardPlatforms();
+    buildWizardApps();
+    goWizardStep(2);
+}
+
+function buildWizardApps() {
+    const grid = document.getElementById('wizard-app-grid');
+    const nameEl = document.getElementById('wizard-platform-name');
+    if (nameEl && wizardPlatform) nameEl.textContent = PLATFORM_META[wizardPlatform].label;
+    if (!grid || !wizardPlatform) return;
+    grid.innerHTML = '';
+    PLATFORMS[wizardPlatform].forEach(function (appId) {
+        const app = APP_DATABASE[appId];
+        grid.appendChild(makeWizardCard(app.icon, app.name, appId === wizardAppId, 'Клиент', function () {
+            wizardSelectApp(appId);
+        }));
+    });
+}
+
+function wizardSelectApp(appId) {
+    wizardAppId = appId;
+    buildWizardApps();
+    buildWizardFinal();
+    goWizardStep(3);
+}
+
+function buildWizardFinal() {
+    const app = APP_DATABASE[wizardAppId];
+    if (!app) return;
+    const icon = document.getElementById('wizard-final-icon');
+    if (icon) icon.className = app.icon;
+    const nm = document.getElementById('wizard-final-name');
+    if (nm) nm.textContent = app.name;
+    const dl = document.getElementById('wizard-final-dl');
+    if (dl) dl.textContent = app.name;
+    const btn = document.getElementById('wizard-download-btn');
+    if (btn) btn.href = app.url;
+    const guide = document.getElementById('wizard-guide');
+    if (guide) guide.innerHTML = app.guide;
+    const protos = document.getElementById('wizard-final-protos');
+    if (protos) {
+        protos.innerHTML = (app.protocols || []).map(function (p) {
+            return '<span class="proto-tag">' + p.toUpperCase() + '</span>';
+        }).join('');
+    }
+}
+
+function goWizardStep(step) {
+    wizardStep = step;
+    for (let i = 1; i <= 3; i++) {
+        const pane = document.getElementById('wizard-pane-' + i);
+        if (pane) pane.style.display = (i === step) ? '' : 'none';
+    }
+    document.querySelectorAll('.wizard-step-dot').forEach(function (dot) {
+        const s = parseInt(dot.getAttribute('data-step'));
+        dot.classList.toggle('active', s === step);
+        dot.classList.toggle('done', s < step);
+    });
+    const ptext = document.getElementById('wizard-progress-text');
+    if (ptext) ptext.textContent = 'Шаг ' + step + '/3';
+
+    const back = document.getElementById('wizard-back-btn');
+    if (back) back.style.display = (step > 1) ? '' : 'none';
+    const finish = document.getElementById('wizard-finish-btn');
+    if (finish) finish.style.display = (step === 3) ? '' : 'none';
+
+    const body = document.querySelector('#wizard-modal .modal-body');
+    if (body) body.scrollTop = 0;
+}
+
+function wizardBack() {
+    if (wizardStep > 1) goWizardStep(wizardStep - 1);
+}
+
+function wizardFinish() {
+    // Sync the main guide UI to the wizard's choice for consistency
+    if (wizardPlatform && wizardAppId) {
+        currentPlatform = wizardPlatform;
+        currentAppId = wizardAppId;
+        updateUI();
+    }
+    closeModal('wizard-modal');
+    setTimeout(function () { openModal('configs-modal'); }, 300);
+}
+
+// --- ONBOARDING (learning mode tooltip on first visit) ---
+function initOnboarding() {
+    let visited = false;
+    try { visited = localStorage.getItem('sd_visited') === '1'; } catch (e) {}
+    if (visited) return;
+
+    const bubble = document.getElementById('wizard-hint-bubble');
+    const btn = document.querySelector('.btn-wizard');
+    if (bubble) {
+        // Reveal after the hero animation settles
+        setTimeout(function () { bubble.classList.add('show'); }, 1500);
+        setTimeout(dismissOnboarding, 14000);
+    }
+    if (btn) btn.classList.add('pulse-hint');
+}
+
+function dismissOnboarding() {
+    try { localStorage.setItem('sd_visited', '1'); } catch (e) {}
+    const bubble = document.getElementById('wizard-hint-bubble');
+    if (bubble) bubble.classList.remove('show');
+    const btn = document.querySelector('.btn-wizard');
+    if (btn) btn.classList.remove('pulse-hint');
 }
 
 function switchConfigTab(tab) {

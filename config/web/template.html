@@ -143,9 +143,19 @@
                     Мы собираем, тестируем и верифицируем лучшие конфигурации связи, 
                     чтобы ваш доступ в интернет оставался бесперебойным.
                 </p>
-                <button class="btn-primary" onclick="openModal('rules-modal')">
-                    <i class="fa-solid fa-key"></i> Получить доступ
-                </button>
+                <div class="hero-actions">
+                    <button class="btn-primary" onclick="openModal('rules-modal')">
+                        <i class="fa-solid fa-key"></i> Получить доступ
+                    </button>
+                    <div class="wizard-cta-wrap">
+                        <button class="btn-secondary btn-wizard" onclick="openWizard()" aria-label="Запустить мастер быстрой настройки">
+                            <i class="fa-solid fa-hat-wizard"></i> Быстрая настройка
+                        </button>
+                        <div class="onboard-bubble" id="wizard-hint-bubble" role="status">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Впервые здесь? Пройдите мастер настройки за 3 шага.
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="grid-layout reveal">
@@ -793,6 +803,69 @@
                 <button class="btn-primary" style="width: 100%; max-width: 100%;" onclick="acceptRules()">
                     <i class="fa-solid fa-check"></i> Активировать доступ
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WIZARD MODAL (US-W10) -->
+    <div class="modal-overlay" id="wizard-modal">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fa-solid fa-hat-wizard" style="color: var(--touhou-sakura);"></i> Быстрая настройка</div>
+                <button class="btn-close" onclick="closeModal('wizard-modal')" aria-label="Закрыть мастер"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- Progress -->
+                <div class="wizard-progress">
+                    <div class="wizard-steps">
+                        <div class="wizard-step-dot active" data-step="1"><span>1</span><label>Платформа</label></div>
+                        <div class="wizard-step-line"></div>
+                        <div class="wizard-step-dot" data-step="2"><span>2</span><label>Клиент</label></div>
+                        <div class="wizard-step-line"></div>
+                        <div class="wizard-step-dot" data-step="3"><span>3</span><label>Готово</label></div>
+                    </div>
+                    <div class="wizard-progress-text" id="wizard-progress-text">Шаг 1/3</div>
+                </div>
+
+                <!-- Step 1: Platform -->
+                <div class="wizard-pane" id="wizard-pane-1">
+                    <p class="wizard-hint">Выберите устройство, на котором будете настраивать подключение:</p>
+                    <div class="app-grid wizard-platform-grid" id="wizard-platform-grid"></div>
+                </div>
+
+                <!-- Step 2: Client -->
+                <div class="wizard-pane" id="wizard-pane-2" style="display:none;">
+                    <p class="wizard-hint">Рекомендованные клиенты для <b id="wizard-platform-name">—</b>. Выберите один:</p>
+                    <div class="app-grid wizard-app-grid" id="wizard-app-grid"></div>
+                </div>
+
+                <!-- Step 3: Instruction + Subscription -->
+                <div class="wizard-pane" id="wizard-pane-3" style="display:none;">
+                    <div class="wizard-final-head">
+                        <i id="wizard-final-icon" class="fa-solid fa-rocket"></i>
+                        <div>
+                            <div class="wizard-final-name" id="wizard-final-name">App</div>
+                            <div class="wizard-final-protos protocol-badges" id="wizard-final-protos"></div>
+                        </div>
+                    </div>
+                    <a href="#" target="_blank" rel="noopener noreferrer" id="wizard-download-btn" class="btn-secondary" style="width: 100%; margin-bottom: 16px; border-color: var(--border-light);">
+                        <span><i class="fa-solid fa-download" style="margin-right: 8px; color: var(--touhou-sakura)"></i> Скачать <b id="wizard-final-dl">App</b></span>
+                    </a>
+                    <h3 style="font-size: 1rem; margin-bottom: 12px;">Импорт и запуск</h3>
+                    <div class="wizard-guide" id="wizard-guide"></div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="wizard-nav">
+                    <button class="btn-secondary wizard-back-btn" id="wizard-back-btn" onclick="wizardBack()" style="display:none;">
+                        <i class="fa-solid fa-arrow-left"></i> Назад
+                    </button>
+                    <button class="btn-primary wizard-finish-btn" id="wizard-finish-btn" onclick="wizardFinish()" style="display:none;">
+                        <i class="fa-solid fa-check"></i> Завершить — получить подписку
+                    </button>
+                </div>
+
             </div>
         </div>
     </div>
