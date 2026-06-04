@@ -84,8 +84,8 @@
         "`python -m py_compile merge.py core/exporter.py core/settings.py` — без ошибок"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "Сейчас speed test только для топ-5. Country stats извлекаются из URL-фрагментов (#XX-name), но не все узлы имеют такой формат. Нужно использовать GeoIP-данные из дронов."
+      "passes": true,
+      "notes": "✅ 2026-06-05: Speed test expanded from top-5 to top-20 via CHAMPION_TOP_N=20 in settings.yaml (configurable). avg_speed, median_speed, speed_percentile_90 added to per-drone stats_*.json and aggregated in merge.py. Country distribution computed from GeoIP data (node.country) in main.py, exported per-drone, aggregated in merge.py. Speed summary dashboard expanded with avg/median/p90 rows. Country stats fall back to URL parsing if no GeoIP data available."
     },
     {
       "id": "US-C05",

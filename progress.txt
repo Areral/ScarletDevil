@@ -151,3 +151,51 @@ Started:  4 июн 2026 г. 23:08:39
 - **Yield tracking:** Даже с round-robin шардингом, качество источников остаётся ключевым фактором. Source yield в телеметрии позволяет идентифицировать лучшие/худшие источники для ручного курирования.
 - **Источники не шардируются на уровне fetching:** Все дроны всё ещё запрашивают все источники. Это даёт redundancy (если один дрон упадёт, другие соберут те же данные), но увеличивает нагрузку на источники. В будущем можно добавить опциональный source-level sharding.
 ---
+
+## 2026-06-05 - US-C04: Расширенный скоростной тест и гео-статистика
+
+### Что сделано
+
+1. **Скоростной тест расширен с топ-5 до топ-20:**
+   - `CHAMPION_TOP_N: 20` в `config/settings.yaml` (настраиваемый параметр)
+   - `core/settings.py`: поле `CHAMPION_TOP_N: int = 20`
+   - `core/engine.py`: передача `champion_top_n` в payload для Go
+   - `go_core/main.go`: `ChampionTopN` в `EngineSettings`, `runChampionPhase` использует `globalSettings.ChampionTopN`
+
+2. **Добавлены агрегированные метрики скорости:**
+   - `main.py`: вычисление `avg_speed`, `median_speed`, `speed_percentile_90` из speeds всех alive nodes
+   - `core/exporter.py`: новые параметры в `save_files()` → поля в `stats_*.json`
+   - `merge.py`: агрегация по дронам (weighted average для avg, max для median/p90)
+
+3. **GeoIP-based country stats:**
+   - `main.py`: распределение по странам из `node.country` (GeoIP-данные от `Inspector._resolve_geo`)
+   - `core/exporter.py`: `country_stats` в per-drone `stats_*.json`
+   - `merge.py`: агрегация country stats со всех дронов, fallback на `_extract_country_stats()` (URL parsing)
+   - `_extract_country_stats` остаётся как fallback для старых/не-GeoIP данных
+
+4. **Расширена секция статистики на дашборде:**
+   - `template.html`: новые data-атрибуты (data-avg-speed, data-median-speed, data-speed-p90)
+   - `template.html`: новые строки в speed summary (Средняя/Медианная/90-й перцентиль)
+   - `main.js`: `initStats()` рендерит новые поля из node-stats JSON blob
+   - `merge.py:build_html()`: новые плейсхолдеры и поля в `node_stats`
+
+### Изменённые файлы
+
+- `config/settings.yaml` — +CHAMPION_TOP_N: 20
+- `core/settings.py` — +CHAMPION_TOP_N field
+- `core/engine.py` — champion_top_n в payload
+- `go_core/main.go` — ChampionTopN в EngineSettings + runChampionPhase
+- `main.py` — вычисление avg/median/p90 + country_stats из GeoIP
+- `core/exporter.py` — новые параметры в save_files + поля в stats JSON
+- `merge.py` — агрегация новых полей, улучшенные country stats
+- `config/web/template.html` — data-атрибуты, расширенная speed summary
+- `config/web/main.js` — рендеринг новых полей в initStats
+- `index.html` — regenerated
+
+### Learnings for future iterations:
+- **Go champion phase:** `runChampionPhase` переиспользует `processSingboxBatch` с `isChampion=true`. Это запускает отдельный sing-box процесс на каждый champion-узел. При 20 чемпионах это 20 sing-box рестартов — значительное увеличение времени (20×~35s = ~700s дополнительно). Важно мониторить общее время дрона.
+- **Speed stat aggregation:** Медиану и перцентили нельзя точно агрегировать между дронами без полного списка скоростей. Текущий подход (max across drones) даёт верхнюю оценку, не точное значение. Для точных метрик нужно либо слать все скорости в merge.py (дорого по данным), либо вычислять в одном дроне.
+- **Country stats эволюция:** Переход от URL-parsing к GeoIP данным значительно точнее — многие узлы не имеют country-меток в URL. GeoIP через ip-api.com даёт актуальную страну VPS-хостера. Fallback на URL parsing сохранён для обратной совместимости.
+- **CHAMPION_TOP_N tradeoff:** Увеличение с 5 до 20 даёт более репрезентативные данные о топ-скоростях, но каждый champion-узел тестируется отдельным sing-box процессом с 10MB загрузкой. 20 чемпионов × ~35s/batch = до 700s дополнительно к общему времени дрона.
+- **index.html regeneration after template changes:** Любое изменение template.html/style.css/main.js требует регенерации index.html. Это уже учтено в workflow.
+---
