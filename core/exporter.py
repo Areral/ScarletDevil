@@ -253,6 +253,7 @@ class Exporter:
             nodes_bs = [n for n in nodes if n.is_bs]
             nodes_chs = [n for n in nodes if not n.is_bs]
 
+        nodes_ru = [n for n in nodes if n.ru_verified]
         nodes_vless = [n for n in nodes if n.protocol == "vless"]
         nodes_vmess = [n for n in nodes if n.protocol == "vmess"]
         nodes_trojan = [n for n in nodes if n.protocol == "trojan"]
@@ -266,6 +267,7 @@ class Exporter:
             (f"sub_all{suffix}.txt", nodes, "Scarlet Devil | Gungnir (MIX)"),
             (f"sub_bs{suffix}.txt", nodes_bs, "Scarlet Devil | Nightbird (БС)"),
             (f"sub_chs{suffix}.txt", nodes_chs, "Scarlet Devil | Vampire Dash (ЧС)"),
+            (f"sub_ru{suffix}.txt", nodes_ru, "Scarlet Devil | Remilia (RU-verified)"),
             (f"sub_vless{suffix}.txt", nodes_vless, "Scarlet Devil | VLESS"),
             (f"sub_vmess{suffix}.txt", nodes_vmess, "Scarlet Devil | VMess"),
             (f"sub_trojan{suffix}.txt", nodes_trojan, "Scarlet Devil | Trojan"),

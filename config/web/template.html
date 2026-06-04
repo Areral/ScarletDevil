@@ -314,89 +314,212 @@
     </div>
 
     <div class="modal-overlay" id="configs-modal">
-        <div class="modal">
+        <div class="modal modal-wide">
             <div class="modal-header">
                 <div class="modal-title"><i class="fa-solid fa-network-wired" style="color: var(--accent);"></i> Выбор маршрута</div>
                 <button class="btn-close" onclick="closeModal('configs-modal')"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 20px;">
-                    Трафик отсортирован и прошел валидацию. Выберите нужную подписку:
-                </p>
 
-                <div class="sub-grid">
-                    <div class="sub-card reality" onclick="copySub('/sub1', 'Nightbird (БС)')">
-                        <div class="sub-header">
-                            <div class="sub-title"><i class="fa-solid fa-mask" style="color: #c4b5fd;"></i> Обход БС</div>
-                            <div class="sub-badge badge-reality">Nightbird</div>
-                        </div>
-                        <div class="sub-desc">Для мобильных сетей с жесткими ограничениями. Трафик мимикрирует под легальные сайты.</div>
-                        <div class="sub-tech">PROTO: VLESS REALITY</div>
-                    </div>
+                <!-- Tab Buttons -->
+                <div class="config-tabs">
+                    <button class="config-tab-btn active" id="config-tab-class" onclick="switchConfigTab('class')">
+                        <i class="fa-solid fa-layer-group"></i> По классу
+                    </button>
+                    <button class="config-tab-btn" id="config-tab-protocol" onclick="switchConfigTab('protocol')">
+                        <i class="fa-solid fa-code-branch"></i> По протоколу
+                    </button>
+                </div>
 
-                    <div class="sub-card fast" onclick="copySub('/sub2', 'Vampire Dash (ЧС)')">
-                        <div class="sub-header">
-                            <div class="sub-title"><i class="fa-solid fa-jet-fighter" style="color: #6ee7b7;"></i> Обход ЧС</div>
-                            <div class="sub-badge badge-fast">Vampire Dash</div>
-                        </div>
-                        <div class="sub-desc">Для стандартного интернета. Максимальная скорость для стриминга и тяжелого трафика.</div>
-                        <div class="sub-tech">PROTO: HYSTERIA2, SS, VMESS</div>
-                    </div>
+                <!-- QR Display (hidden by default) -->
+                <div id="qr-display" class="qr-display">
+                    <button class="qr-back-btn" onclick="hideQR()">
+                        <i class="fa-solid fa-arrow-left"></i> Назад к подпискам
+                    </button>
+                    <div class="qr-label" id="qr-label">Sub</div>
+                    <div id="qr-container" class="qr-container"></div>
+                </div>
 
-                    <div class="sub-card mix" onclick="copySub('/sub', 'Gungnir (MIX)')">
-                        <div class="sub-header">
-                            <div class="sub-title"><i class="fa-solid fa-infinity" style="color: #fda4af;"></i> MIX База</div>
-                            <div class="sub-badge badge-mix">Gungnir</div>
-                        </div>
-                        <div class="sub-desc">Полный гримуар всех живых узлов. Идеально для ПК клиентов с автоматическим URL-тестом.</div>
-                        <div class="sub-tech">PROTO: ALL PROTOCOLS</div>
-                    </div>
+                <!-- Tab: По классу -->
+                <div class="config-tab-content" id="config-tab-class-content">
+                    <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 20px;">
+                        Трафик отсортирован и прошёл валидацию. Выберите класс маршрута:
+                    </p>
 
-                    <div class="sub-card vless" onclick="copySub('/sub/vless', 'VLESS')">
-                        <div class="sub-header">
-                            <div class="sub-title"><i class="fa-solid fa-ghost" style="color: #c4b5fd;"></i> VLESS Reality</div>
-                            <div class="sub-badge badge-vless">VLESS</div>
+                    <div class="sub-grid">
+                        <!-- Nightbird (БС) -->
+                        <div class="sub-card reality">
+                            <div class="sub-header">
+                                <div class="sub-title"><i class="fa-solid fa-mask" style="color: #c4b5fd;"></i> Обход БС</div>
+                                <div class="sub-badge badge-reality">Nightbird</div>
+                            </div>
+                            <div class="sub-desc">Для мобильных сетей с жёсткими ограничениями. Трафик мимикрирует под легальные сайты.</div>
+                            <div class="sub-tech">PROTO: VLESS REALITY</div>
+                            <div class="sub-actions">
+                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub1', 'Nightbird (БС)')">
+                                    <i class="fa-solid fa-copy"></i> Копировать URL
+                                </button>
+                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub1', 'Nightbird — Обход БС')">
+                                    <i class="fa-solid fa-qrcode"></i> QR
+                                </button>
+                            </div>
                         </div>
-                        <div class="sub-desc">Только VLESS XTLS-Vision/Reality узлы. Максимальная маскировка под HTTPS, идеально для жёсткого DPI.</div>
-                        <div class="sub-tech">PROTO: VLESS</div>
-                    </div>
 
-                    <div class="sub-card vmess" onclick="copySub('/sub/vmess', 'VMess')">
-                        <div class="sub-header">
-                            <div class="sub-title"><i class="fa-solid fa-shield-halved" style="color: #7dd3fc;"></i> VMess</div>
-                            <div class="sub-badge badge-vmess">VMess</div>
+                        <!-- Vampire Dash (ЧС) -->
+                        <div class="sub-card fast">
+                            <div class="sub-header">
+                                <div class="sub-title"><i class="fa-solid fa-jet-fighter" style="color: #6ee7b7;"></i> Обход ЧС</div>
+                                <div class="sub-badge badge-fast">Vampire Dash</div>
+                            </div>
+                            <div class="sub-desc">Для стандартного интернета. Максимальная скорость для стриминга и тяжёлого трафика.</div>
+                            <div class="sub-tech">PROTO: HYSTERIA2, SS, VMESS</div>
+                            <div class="sub-actions">
+                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub2', 'Vampire Dash (ЧС)')">
+                                    <i class="fa-solid fa-copy"></i> Копировать URL
+                                </button>
+                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub2', 'Vampire Dash — Обход ЧС')">
+                                    <i class="fa-solid fa-qrcode"></i> QR
+                                </button>
+                            </div>
                         </div>
-                        <div class="sub-desc">Только VMess узлы (WebSocket/gRPC/TCP). Широкая совместимость со всеми клиентами.</div>
-                        <div class="sub-tech">PROTO: VMESS</div>
-                    </div>
 
-                    <div class="sub-card trojan" onclick="copySub('/sub/trojan', 'Trojan')">
-                        <div class="sub-header">
-                            <div class="sub-title"><i class="fa-solid fa-horse-head" style="color: #fde047;"></i> Trojan</div>
-                            <div class="sub-badge badge-trojan">Trojan</div>
+                        <!-- Gungnir (MIX) -->
+                        <div class="sub-card mix">
+                            <div class="sub-header">
+                                <div class="sub-title"><i class="fa-solid fa-infinity" style="color: #fda4af;"></i> MIX База</div>
+                                <div class="sub-badge badge-mix">Gungnir</div>
+                            </div>
+                            <div class="sub-desc">Полный гримуар всех живых узлов. Идеально для ПК-клиентов с автоматическим URL-тестом.</div>
+                            <div class="sub-tech">PROTO: ALL PROTOCOLS</div>
+                            <div class="sub-actions">
+                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub', 'Gungnir (MIX)')">
+                                    <i class="fa-solid fa-copy"></i> Копировать URL
+                                </button>
+                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub', 'Gungnir — MIX База')">
+                                    <i class="fa-solid fa-qrcode"></i> QR
+                                </button>
+                            </div>
                         </div>
-                        <div class="sub-desc">Только Trojan/Trojan-Go узлы. Проверенный протокол с TLS-маскировкой под обычный HTTPS.</div>
-                        <div class="sub-tech">PROTO: TROJAN</div>
-                    </div>
 
-                    <div class="sub-card ss" onclick="copySub('/sub/ss', 'Shadowsocks')">
-                        <div class="sub-header">
-                            <div class="sub-title"><i class="fa-solid fa-feather" style="color: #6ee7b7;"></i> Shadowsocks</div>
-                            <div class="sub-badge badge-ss">SS</div>
+                        <!-- Remilia (RU-verified) -->
+                        <div class="sub-card ru-verified">
+                            <div class="sub-header">
+                                <div class="sub-title"><i class="fa-solid fa-crown" style="color: #fbbf24;"></i> RU-Проверенные</div>
+                                <div class="sub-badge badge-ru">Remilia</div>
+                            </div>
+                            <div class="sub-desc">Узлы, проверенные из РФ. Гарантированно обходят ТСПУ и работают на российских провайдерах.</div>
+                            <div class="sub-tech">ПРОВЕРЕНО ИЗ РФ</div>
+                            <div class="sub-actions">
+                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub/ru', 'Remilia (RU)')">
+                                    <i class="fa-solid fa-copy"></i> Копировать URL
+                                </button>
+                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub/ru', 'Remilia — RU-Проверенные')">
+                                    <i class="fa-solid fa-qrcode"></i> QR
+                                </button>
+                            </div>
                         </div>
-                        <div class="sub-desc">Только Shadowsocks узлы. Лёгкий и быстрый протокол, хорош для стриминга на стабильных сетях.</div>
-                        <div class="sub-tech">PROTO: SHADOWSOCKS</div>
-                    </div>
-
-                    <div class="sub-card hy2" onclick="copySub('/sub/hy2', 'Hysteria2')">
-                        <div class="sub-header">
-                            <div class="sub-title"><i class="fa-solid fa-bolt" style="color: #f9a8d4;"></i> Hysteria2</div>
-                            <div class="sub-badge badge-hy2">HY2</div>
-                        </div>
-                        <div class="sub-desc">Только Hysteria2 узлы. Максимальная скорость через QUIC, идеально для видео и больших загрузок.</div>
-                        <div class="sub-tech">PROTO: HYSTERIA2</div>
                     </div>
                 </div>
+
+                <!-- Tab: По протоколу -->
+                <div class="config-tab-content" id="config-tab-protocol-content" style="display:none;">
+                    <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 20px;">
+                        Отфильтровано по протоколу. Выберите нужный тип соединения:
+                    </p>
+
+                    <div class="sub-grid">
+                        <!-- VLESS -->
+                        <div class="sub-card vless">
+                            <div class="sub-header">
+                                <div class="sub-title"><i class="fa-solid fa-ghost" style="color: #c4b5fd;"></i> VLESS Reality</div>
+                                <div class="sub-badge badge-vless">VLESS</div>
+                            </div>
+                            <div class="sub-desc">Только VLESS XTLS-Vision/Reality узлы. Максимальная маскировка под HTTPS, идеально для жёсткого DPI.</div>
+                            <div class="sub-tech">PROTO: VLESS</div>
+                            <div class="sub-actions">
+                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub/vless', 'VLESS')">
+                                    <i class="fa-solid fa-copy"></i> Копировать URL
+                                </button>
+                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub/vless', 'VLESS Reality')">
+                                    <i class="fa-solid fa-qrcode"></i> QR
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- VMess -->
+                        <div class="sub-card vmess">
+                            <div class="sub-header">
+                                <div class="sub-title"><i class="fa-solid fa-shield-halved" style="color: #7dd3fc;"></i> VMess</div>
+                                <div class="sub-badge badge-vmess">VMess</div>
+                            </div>
+                            <div class="sub-desc">Только VMess узлы (WebSocket/gRPC/TCP). Широкая совместимость со всеми клиентами.</div>
+                            <div class="sub-tech">PROTO: VMESS</div>
+                            <div class="sub-actions">
+                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub/vmess', 'VMess')">
+                                    <i class="fa-solid fa-copy"></i> Копировать URL
+                                </button>
+                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub/vmess', 'VMess')">
+                                    <i class="fa-solid fa-qrcode"></i> QR
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Trojan -->
+                        <div class="sub-card trojan">
+                            <div class="sub-header">
+                                <div class="sub-title"><i class="fa-solid fa-horse-head" style="color: #fde047;"></i> Trojan</div>
+                                <div class="sub-badge badge-trojan">Trojan</div>
+                            </div>
+                            <div class="sub-desc">Только Trojan/Trojan-Go узлы. Проверенный протокол с TLS-маскировкой под обычный HTTPS.</div>
+                            <div class="sub-tech">PROTO: TROJAN</div>
+                            <div class="sub-actions">
+                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub/trojan', 'Trojan')">
+                                    <i class="fa-solid fa-copy"></i> Копировать URL
+                                </button>
+                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub/trojan', 'Trojan')">
+                                    <i class="fa-solid fa-qrcode"></i> QR
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Shadowsocks -->
+                        <div class="sub-card ss">
+                            <div class="sub-header">
+                                <div class="sub-title"><i class="fa-solid fa-feather" style="color: #6ee7b7;"></i> Shadowsocks</div>
+                                <div class="sub-badge badge-ss">SS</div>
+                            </div>
+                            <div class="sub-desc">Только Shadowsocks узлы. Лёгкий и быстрый протокол, хорош для стриминга на стабильных сетях.</div>
+                            <div class="sub-tech">PROTO: SHADOWSOCKS</div>
+                            <div class="sub-actions">
+                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub/ss', 'Shadowsocks')">
+                                    <i class="fa-solid fa-copy"></i> Копировать URL
+                                </button>
+                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub/ss', 'Shadowsocks')">
+                                    <i class="fa-solid fa-qrcode"></i> QR
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Hysteria2 -->
+                        <div class="sub-card hy2">
+                            <div class="sub-header">
+                                <div class="sub-title"><i class="fa-solid fa-bolt" style="color: #f9a8d4;"></i> Hysteria2</div>
+                                <div class="sub-badge badge-hy2">HY2</div>
+                            </div>
+                            <div class="sub-desc">Только Hysteria2 узлы. Максимальная скорость через QUIC, идеально для видео и больших загрузок.</div>
+                            <div class="sub-tech">PROTO: HYSTERIA2</div>
+                            <div class="sub-actions">
+                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub/hy2', 'Hysteria2')">
+                                    <i class="fa-solid fa-copy"></i> Копировать URL
+                                </button>
+                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub/hy2', 'Hysteria2')">
+                                    <i class="fa-solid fa-qrcode"></i> QR
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>

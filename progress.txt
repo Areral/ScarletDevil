@@ -76,3 +76,61 @@ Branch: ralph/website-overhaul
   - Font Awesome 6 Free icons: verify availability before using — prefer solid style (fa-solid)
   - Quality checks for JS: `node --check` catches syntax errors without executing DOM-dependent code
 ---
+
+## 2026-06-04 - US-W03
+- **What was implemented:**
+  - Added `<div class="guide-tip">` block (Совет) for all 22 apps with specific, actionable advice
+  - Added `<div class="guide-troubleshoot">` block (Решение проблем) for all 22 apps with 2-3 common issues and solutions
+  - Added `<div class="guide-config">` block with copy-paste CLI configs for router apps (mikrotik WireGuard config, openwrt OpenClash install script)
+  - Fixed v2raytun from 4 to 5 steps (split "обновите и выберите" into two distinct steps)
+  - Enhanced existing guides: more specific button names (e.g., «OK» vs «Ок»), platform-appropriate instructions, concrete DNS/port advice
+  - Added CSS for `.guide-tip` (green left-border, cyber-green accent), `.guide-troubleshoot` (amber left-border, facc15 accent, nested ul/li styling), `.guide-config` (dark code block with label)
+- **Files changed:** config/web/main.js, config/web/style.css
+- **Platform patterns applied:**
+  - Android apps: instructions emphasize clipboard import and battery optimization (v2rayNG, SagerNet, FoXray, v2RayTun)
+  - iOS apps: instructions emphasize Subscribe URL and iOS-specific limitations (V2Box, Shadowrocket, Streisand, Stash, Surge)
+  - Router apps: instructions include CLI copy-paste configs and system-level troubleshooting (MikroTik, OpenWRT)
+  - CLI apps: instructions include systemd/service setup and permission troubleshooting (Sing-box CLI, Mihomo)
+- **Learnings for future iterations:**
+  - Guide blocks are injected as raw HTML via `updateUI()` → `innerHTML` — no template engine involved
+  - Each guide's tip/troubleshooting should be app-specific, not generic — the value is in knowing exact menu paths and common failure modes for that specific client
+  - The CSS for nested lists inside `.guide-troubleshoot` needs explicit `ul/li` selectors since the base `.text-block` styles don't apply inside `.instruction-box`
+  - Router config blocks use `<pre>` for preserved formatting — `white-space: pre-wrap` is essential for mobile responsiveness
+  - Guide bloat is real: each app now has ~40-60 lines of HTML. If this grows further, consider extracting guides to a separate data file
+---
+
+## 2026-06-04 - US-W04
+- **What was implemented:**
+  - **configs-modal** (template.html): Полностью переработан на двухвкладочный layout:
+    - Вкладка «По классу»: 4 карточки — Nightbird (БС), Vampire Dash (ЧС), Gungnir (MIX), Remilia (RU-verified)
+    - Вкладка «По протоколу»: 5 карточек — VLESS, VMess, Trojan, Shadowsocks, Hysteria2
+    - Каждая карточка имеет кнопки «Копировать URL» и «QR»
+    - RU-verified карточка визуально выделена золотой рамкой и пометкой «Remilia»
+    - Добавлена область отображения QR-кода с кнопкой «Назад»
+  - **QR-генератор** (main.js): Самописный, без внешних зависимостей (~250 строк):
+    - GF(256) арифметика (exp/log таблицы, примитивный полином 0x11D)
+    - Кодирование в Byte mode с выбором версии (1-6), EC Level L
+    - Полиномиальный Reed-Solomon для коррекции ошибок
+    - Построение QR-матрицы: finder patterns, timing, alignment, форматная информация
+    - Оценка 8 масок по 4 правилам штрафа, выбор лучшей
+    - Рендеринг на canvas с отступами
+  - **Clipboard fallback** (main.js): `navigator.clipboard.writeText` → `execCommand('copy')` → `prompt()` для ручного копирования
+  - **Modal UX**: Закрытие по Escape, закрытие по клику на overlay
+  - **Backend plumbing** (US-W04 + prep for US-W08):
+    - `ProxyNode.ru_verified: bool = False` в models.py
+    - `nodes_ru` фильтрация в exporter.py, генерация `sub_ru_*.txt`
+    - `merge_subscription_files` для `sub_ru_*.txt` в merge.py
+    - vercel.json: rewrite `/sub/ru` → `sub_ru.txt`
+  - **CSS** (style.css): `.config-tabs`/`.config-tab-btn`, `.sub-actions`/`.sub-action-btn.copy-btn`/`.qr-btn`, `.sub-card.ru-verified`/`.badge-ru`, `.qr-display`/`.qr-container`/`.qr-back-btn`, `.modal-wide`, responsive sub-grid (2 колонки ≥500px, 1 колонка mobile)
+- **Files changed:** config/web/template.html, config/web/main.js, config/web/style.css, core/models.py, core/exporter.py, merge.py, vercel.json
+- **Learnings for future iterations:**
+  - QR-генератор использует таблицы GF(256) с примитивным полиномом 0x11D (x^8+x^4+x^3+x^2+1). EXP[0..511], LOG[0..255] для быстрого умножения. gfInv(a) = EXP[255 - LOG[a]].
+  - Форматная информация (15 бит) предвычислена для EC Level L × 8 масок. Бит 14 → [8,0], бит 0 → [0,8] (вокруг верхнего левого finder'а) и зеркально.
+  - В modal-wide (max-width: 620px) сетка карточек подписок 2×N на десктопе, 1×N на мобильных (breakpoint 500px).
+  - `execCommand('copy')` требует временного textarea в DOM, фокуса и select(). Работает как fallback когда clipboard API недоступен (HTTP, старые браузеры).
+  - `event.stopPropagation()` на кнопках внутри sub-card критичен — без него клик по кнопке всплывает на родительский div.
+  - `config-tab-content` скрывается/показывается через `style.display`, а не классы — чтобы не конфликтовать с CSS-анимациями reveal.
+  - Для QR area: кнопки табов блокируются (`pointerEvents: none`, `opacity: 0.4`) при показе QR, восстанавливаются при возврате.
+  - RU-verified plumbing добавлен минимально: модель, exporter, merge, vercel. Логика определения `ru_verified` (какие узлы считать проверенными из РФ) оставлена для US-W08.
+---
+

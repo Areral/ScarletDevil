@@ -555,3 +555,182 @@ section:last-of-type { border-bottom: none; }
     letter-spacing: 0.5px;
     white-space: nowrap;
 }
+
+/* --- WIDER MODAL for Configs --- */
+.modal-wide { max-width: 620px; }
+
+/* --- CONFIG MODAL TABS --- */
+.config-tabs {
+    display: flex;
+    background: rgba(0,0,0,0.4);
+    padding: 5px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+    gap: 4px;
+}
+.config-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    padding: 11px 16px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: var(--trans);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.config-tab-btn:hover {
+    background: rgba(225, 29, 72, 0.08);
+    color: #fff;
+}
+.config-tab-btn.active {
+    background: rgba(225, 29, 72, 0.2);
+    color: #fff;
+    border-color: var(--touhou-red);
+    box-shadow: 0 0 12px rgba(225, 29, 72, 0.15);
+}
+
+/* --- SUB CARD ACTION BUTTONS --- */
+.sub-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+.sub-action-btn {
+    flex: 1;
+    min-width: 120px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.35);
+    color: var(--text-dim);
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--trans);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.sub-action-btn:hover {
+    transform: translateY(-2px);
+    color: #fff;
+}
+.sub-action-btn.copy-btn:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: var(--cyber-blue);
+    box-shadow: 0 4px 15px rgba(56, 189, 248, 0.2);
+}
+.sub-action-btn.qr-btn:hover {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: var(--touhou-purple);
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.2);
+}
+
+/* --- RU-VERIFIED CARD --- */
+.sub-card.ru-verified {
+    border-color: rgba(251, 191, 36, 0.5);
+    background: rgba(251, 191, 36, 0.04);
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.08), inset 0 0 30px rgba(251, 191, 36, 0.03);
+}
+.sub-card.ru-verified::before {
+    background: linear-gradient(to bottom, #fbbf24, #f59e0b);
+    width: 5px;
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
+}
+.sub-card.ru-verified:hover {
+    border-color: #fbbf24;
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.25);
+    transform: translateX(5px);
+}
+.badge-ru {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    font-size: 0.6rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+/* --- QR DISPLAY --- */
+.qr-display {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0;
+}
+.qr-display.active {
+    display: flex;
+}
+.qr-back-btn {
+    align-self: flex-start;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: var(--trans);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.qr-back-btn:hover {
+    background: rgba(225, 29, 72, 0.1);
+    border-color: var(--touhou-red);
+    color: #fff;
+}
+.qr-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--touhou-sakura);
+    margin-bottom: 16px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.qr-container {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 0 30px rgba(225, 29, 72, 0.15);
+    display: inline-block;
+    line-height: 0;
+}
+.qr-container canvas {
+    display: block;
+    border-radius: 4px;
+}
+
+/* --- SUB GRID RESPONSIVE --- */
+@media (min-width: 500px) {
+    .sub-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+@media (max-width: 499px) {
+    .sub-grid {
+        grid-template-columns: 1fr;
+    }
+}

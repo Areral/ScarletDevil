@@ -218,6 +218,11 @@ def main() -> None:
         "Scarlet Devil | Vampire Dash (ЧС)",
     )
     merge_subscription_files(
+        "shards_temp/shard-data-*/sub_ru_*.txt",
+        "sub_ru.txt",
+        "Scarlet Devil | Remilia (RU-verified)",
+    )
+    merge_subscription_files(
         "shards_temp/shard-data-*/sub_vless_*.txt",
         "sub_vless.txt",
         "Scarlet Devil | VLESS",
