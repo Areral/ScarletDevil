@@ -165,3 +165,29 @@ Branch: ralph/website-overhaul
   - `window.innerWidth` heuristic for Android TV was unreliable (tablets, landscape phones would falsely trigger). Pure userAgent check (`ua.includes('tv')`) is the correct approach
 ---
 
+## 2026-06-04 - US-W06
+- **What was implemented:**
+  - **Scanline overlay:** CRT scanline effect (`repeating-linear-gradient`) toggleable via fun-panel button (fa-barcode). Intensity-responsive (denser lines at Extreme).
+  - **Enhanced scarlet mist:** Multi-layered radial gradients (3 layers + ::before with 2 drift layers). Mist particles spawn at Extreme intensity (MutationObserver on mist/body class changes).
+  - **Glitch + neon focus:** `glitch-skew` animation on h1/h2 hover with red/blue text-shadow split. `*:focus-visible` neon outline with sakura glow. `glitch-clip` keyframe reserved.
+  - **Custom scrollbar + selection:** `::-webkit-scrollbar` styled in touhou-crimson with rounded thumbs. Firefox `scrollbar-width: thin` + `scrollbar-color`. `::selection` in touhou-red with glow.
+  - **Typewriter sys-log:** `initTypewriter()` stores original HTML, clears lines, types character-by-character (15-40ms per char, 200ms pause between lines). HTML-aware (skips tags as units). Blinking cursor (`▮`) with `blink-cursor` animation appended to current line.
+  - **Effect intensity switch:** M/N/E cycle button at bottom-left (top-left on mobile). Body classes: `fx-minimal` (hides scanline/stardust/mist-particles, disables glitch/border-anim), default Normal, `fx-extreme` (faster mist, glitch infinite, full border opacity, denser scanlines, mist particles). Saved to localStorage `sd_fx_intensity`.
+  - **Enhanced color palette:** More saturated :root variables (bg-void from #0f0508→#0a0306, accent from #f43f5e→#fb3b5c). Glow variant variables (--touhou-red-glow, --touhou-purple-glow, etc.). Third radial gradient on body. Theme foundation variables (--theme-glow-primary, etc.).
+  - **Animated sub-card border:** Changed `.sub-card` accent bar from `::before` pseudo-element to `border-left: 4px solid`. Repurposed `::before` for conic-gradient rotating border (`@keyframes border-spin`, 4s linear). `::after` provides inner mask. Activates on hover (`animation-play-state: running`). RU-verified card has golden variant.
+  - **Star dust canvas:** Canvas-based particle system (80 particles, 0.5-2px radius). Sine-wave pulsing alpha. Glow halos (3x radius at 15% opacity). `requestAnimationFrame` loop. Toggleable via fun-panel (fa-sparkles). Saved to localStorage `sd_fx_states`.
+  - **CSS theme variables:** Full `[data-theme="midnight"]` (blue palette: bg-void #020510, accents shifted to blues/indigos) and `[data-theme="sakura"]` (pink palette: bg-void #12050a, accents shifted to pink/rose) blocks with all variable overrides.
+  - **LocalStorage persistence:** All effect states (mist, danmaku, bats, scanline, stardust) saved as JSON in `sd_fx_states`. Intensity level saved as integer in `sd_fx_intensity`. States restored on page load.
+  - **Mobile parity:** Scanline and stardust buttons added to mobile nav fun section. Synced with desktop buttons via existing click-forwarding pattern.
+- **Files changed:** config/web/style.css, config/web/template.html, config/web/main.js, prd.json, progress.txt
+- **Learnings for future iterations:**
+  - `MutationObserver` on body class changes is the cleanest way for intensity-dependent effects to react to changes without tight coupling between initFXControl and every effect system
+  - The sub-card accent bar migration (::before → border-left) freed up ::before for the animated border. Use `border-left` for simple accent bars when both pseudo-elements are needed for other effects
+  - Conic-gradient rotating border via `::before` with `::after` inner mask: works cross-browser without `@property`. Set `animation-play-state: paused` by default, `running` on hover
+  - Typewriter animation needs HTML-awareness: skip from `<` to `>` as a unit to avoid breaking tag structure. Insert cursor span by removing/re-adding it to current line
+  - Canvas stardust: resize canvas on window resize. Use `canvas.classList.contains('active')` as the animation gate (checked each frame) — cleaner than external flag variables
+  - Theme system via `[data-theme="..."]` attribute selectors: no JS needed to switch themes, just set `document.documentElement.setAttribute('data-theme', 'midnight')`. The base :root provides theme foundation variables for components to reference
+  - The `glitch-clip` keyframe is defined but unused by default — reserved for future use with `data-text` attributes on headings
+  - `saveFXStates()` helper called after every effect toggle keeps localStorage in sync. JSON.parse with fallback `{}` on init prevents errors from corrupted storage
+---
+

@@ -961,6 +961,9 @@ function init() {
     initMobileNav();
     initLocalTime();
     initAccessibility();
+    initFXControl();
+    initTypewriter();
+    initStarDust();
 }
 
 function switchPlatform(platform) {
@@ -1182,61 +1185,148 @@ function initFunPanel() {
     const btnMist = document.getElementById('btn-mist');
     const btnDanmaku = document.getElementById('btn-danmaku');
     const btnBats = document.getElementById('btn-bats');
+    const btnScanline = document.getElementById('btn-scanline');
+    const btnStardust = document.getElementById('btn-stardust');
 
     const mistLayer = document.getElementById('mist-layer');
+    const scanlineOverlay = document.getElementById('scanline-overlay');
+    const stardustCanvas = document.getElementById('stardust-canvas');
 
     let danmakuInterval = null;
     let batsInterval = null;
 
+    // Restore saved effect states
+    try {
+        const savedFX = JSON.parse(localStorage.getItem('sd_fx_states') || '{}');
+        if (savedFX.mist) { btnMist.classList.add('active'); mistLayer.classList.add('active'); }
+        if (savedFX.danmaku) startDanmaku();
+        if (savedFX.bats) startBats();
+        if (savedFX.scanline) { btnScanline.classList.add('active'); scanlineOverlay.classList.add('active'); }
+        if (savedFX.stardust) { btnStardust.classList.add('active'); stardustCanvas.classList.add('active'); startStardust(); }
+    } catch(e) {}
+
+    function saveFXStates() {
+        try {
+            localStorage.setItem('sd_fx_states', JSON.stringify({
+                mist: btnMist.classList.contains('active'),
+                danmaku: btnDanmaku.classList.contains('active'),
+                bats: btnBats.classList.contains('active'),
+                scanline: btnScanline.classList.contains('active'),
+                stardust: btnStardust.classList.contains('active')
+            }));
+        } catch(e) {}
+    }
+
     btnMist.addEventListener('click', () => {
         btnMist.classList.toggle('active');
         mistLayer.classList.toggle('active');
+        saveFXStates();
     });
 
+    const mistParticleInterval = { ref: null };
+    function startMistParticles() {
+        if (mistParticleInterval.ref) return;
+        mistParticleInterval.ref = setInterval(() => {
+            if (!mistLayer.classList.contains('active')) return;
+            const p = document.createElement('div');
+            p.className = 'mist-particle';
+            const size = Math.random() * 80 + 30;
+            p.style.width = size + 'px';
+            p.style.height = size + 'px';
+            p.style.left = Math.random() * 100 + 'vw';
+            p.style.bottom = '-10px';
+            p.style.setProperty('--px', (Math.random() * 60 - 30) + 'px');
+            p.style.animationDuration = (Math.random() * 6 + 4) + 's';
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 11000);
+        }, 600);
+    }
+    // Observe mist for extreme mode particle spawning
+    const mistObserver = new MutationObserver(() => {
+        if (mistLayer.classList.contains('active') && document.body.classList.contains('fx-extreme')) {
+            startMistParticles();
+        } else {
+            if (mistParticleInterval.ref) { clearInterval(mistParticleInterval.ref); mistParticleInterval.ref = null; }
+        }
+    });
+    mistObserver.observe(mistLayer, { attributes: true, attributeFilter: ['class'] });
+    // Also observe body for fx class changes
+    const bodyObserver = new MutationObserver(() => {
+        if (mistLayer.classList.contains('active') && document.body.classList.contains('fx-extreme')) {
+            startMistParticles();
+        } else if (!document.body.classList.contains('fx-extreme')) {
+            if (mistParticleInterval.ref) { clearInterval(mistParticleInterval.ref); mistParticleInterval.ref = null; }
+        }
+    });
+    bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+    function startDanmaku() {
+        btnDanmaku.classList.add('active');
+        danmakuInterval = setInterval(() => {
+            const orb = document.createElement('div');
+            orb.className = 'danmaku-bullet';
+            const size = Math.random() * 12 + 6;
+            orb.style.width = size + 'px';
+            orb.style.height = size + 'px';
+            orb.style.left = Math.random() * 100 + 'vw';
+            orb.style.top = '-20px';
+            orb.style.color = Math.random() > 0.5 ? '#f472b6' : '#e11d48';
+            orb.style.backgroundColor = 'currentColor';
+            orb.style.animationDuration = (Math.random() * 3 + 2) + 's';
+            document.body.appendChild(orb);
+            setTimeout(() => orb.remove(), 6000);
+        }, 150);
+    }
+    function stopDanmaku() {
+        if (danmakuInterval) { clearInterval(danmakuInterval); danmakuInterval = null; }
+        btnDanmaku.classList.remove('active');
+    }
     btnDanmaku.addEventListener('click', () => {
-        if (danmakuInterval) {
-            clearInterval(danmakuInterval);
-            danmakuInterval = null;
-            btnDanmaku.classList.remove('active');
-        } else {
-            btnDanmaku.classList.add('active');
-            danmakuInterval = setInterval(() => {
-                const orb = document.createElement('div');
-                orb.className = 'danmaku-bullet';
-                const size = Math.random() * 12 + 6;
-                orb.style.width = size + 'px';
-                orb.style.height = size + 'px';
-                orb.style.left = Math.random() * 100 + 'vw';
-                orb.style.top = '-20px';
-                orb.style.color = Math.random() > 0.5 ? '#f472b6' : '#e11d48';
-                orb.style.backgroundColor = 'currentColor';
-                orb.style.animationDuration = (Math.random() * 3 + 2) + 's';
-                document.body.appendChild(orb);
-                setTimeout(() => orb.remove(), 6000);
-            }, 150);
-        }
+        if (danmakuInterval) { stopDanmaku(); } else { startDanmaku(); }
+        saveFXStates();
     });
 
+    function startBats() {
+        btnBats.classList.add('active');
+        batsInterval = setInterval(() => {
+            const bat = document.createElement('div');
+            bat.className = 'bat-spirit';
+            bat.innerHTML = '<i class="fa-solid fa-ghost"></i>';
+            bat.style.color = Math.random() > 0.5 ? '#8b5cf6' : '#e11d48';
+            bat.style.left = '-50px';
+            bat.style.top = (Math.random() * 80 + 10) + 'vh';
+            bat.style.setProperty('--y-end', (Math.random() * 200 - 100) + 'px');
+            bat.style.animationDuration = (Math.random() * 4 + 4) + 's';
+            document.body.appendChild(bat);
+            setTimeout(() => bat.remove(), 9000);
+        }, 800);
+    }
+    function stopBats() {
+        if (batsInterval) { clearInterval(batsInterval); batsInterval = null; }
+        btnBats.classList.remove('active');
+    }
     btnBats.addEventListener('click', () => {
-        if (batsInterval) {
-            clearInterval(batsInterval);
-            batsInterval = null;
-            btnBats.classList.remove('active');
+        if (batsInterval) { stopBats(); } else { startBats(); }
+        saveFXStates();
+    });
+
+    // Scanline toggle
+    btnScanline.addEventListener('click', () => {
+        btnScanline.classList.toggle('active');
+        scanlineOverlay.classList.toggle('active');
+        saveFXStates();
+    });
+
+    // Stardust toggle
+    btnStardust.addEventListener('click', () => {
+        btnStardust.classList.toggle('active');
+        stardustCanvas.classList.toggle('active');
+        if (stardustCanvas.classList.contains('active')) {
+            startStardust();
         } else {
-            btnBats.classList.add('active');
-            batsInterval = setInterval(() => {
-                const bat = document.createElement('div');
-                bat.className = 'bat-spirit';
-                bat.innerHTML = '<i class="fa-solid fa-ghost"></i>';
-                bat.style.color = Math.random() > 0.5 ? '#8b5cf6' : '#e11d48';
-                bat.style.left = '-50px';
-                bat.style.top = (Math.random() * 80 + 10) + 'vh';
-                bat.style.setProperty('--y-end', (Math.random() * 200 - 100) + 'px');
-                bat.style.animationDuration = (Math.random() * 4 + 4) + 's';
-                document.body.appendChild(bat);
-                setTimeout(() => bat.remove(), 9000);
-            }, 800);
+            stopStardust();
         }
+        saveFXStates();
     });
 }
 
@@ -1287,7 +1377,9 @@ function initMobileNav() {
     const mobileFunBtns = {
         'btn-mist-mobile': 'btn-mist',
         'btn-danmaku-mobile': 'btn-danmaku',
-        'btn-bats-mobile': 'btn-bats'
+        'btn-bats-mobile': 'btn-bats',
+        'btn-scanline-mobile': 'btn-scanline',
+        'btn-stardust-mobile': 'btn-stardust'
     };
     Object.entries(mobileFunBtns).forEach(function([mobileId, desktopId]) {
         const mobileBtn = document.getElementById(mobileId);
@@ -1344,6 +1436,224 @@ function initAccessibility() {
         });
     });
     observer.observe(appGrid, { childList: true, subtree: true });
+}
+
+// --- EFFECT INTENSITY CONTROL (Minimal / Normal / Extreme) ---
+function initFXControl() {
+    const toggle = document.getElementById('fx-toggle');
+    if (!toggle) return;
+
+    const levels = ['M', 'N', 'E'];
+    const classes = ['fx-minimal', '', 'fx-extreme'];
+    const titles = ['Minimal — базовые эффекты', 'Normal — стандартные эффекты', 'Extreme — максимальные эффекты'];
+    const labels = ['Min', 'Norm', 'Ext'];
+
+    // Restore saved intensity
+    let idx = 1; // default: Normal
+    try {
+        const saved = parseInt(localStorage.getItem('sd_fx_intensity'));
+        if (!isNaN(saved) && saved >= 0 && saved <= 2) idx = saved;
+    } catch(e) {}
+
+    function applyIntensity(i) {
+        // Remove all fx classes
+        document.body.classList.remove('fx-minimal', 'fx-extreme');
+        if (classes[i]) document.body.classList.add(classes[i]);
+        toggle.textContent = levels[i];
+        toggle.title = titles[i];
+        try { localStorage.setItem('sd_fx_intensity', i); } catch(e) {}
+
+        // Show/hide intensity label
+        const label = document.querySelector('.fx-label');
+        if (label) label.textContent = labels[i];
+    }
+
+    applyIntensity(idx);
+
+    toggle.addEventListener('click', () => {
+        idx = (idx + 1) % 3;
+        applyIntensity(idx);
+    });
+}
+
+// --- TYPEWRITER EFFECT FOR SYS-LOG ---
+function initTypewriter() {
+    const log = document.querySelector('.sys-log');
+    if (!log) return;
+
+    const lines = log.querySelectorAll('.line');
+    if (lines.length === 0) return;
+
+    // Store original HTMLs
+    const originals = [];
+    lines.forEach(function(line) {
+        originals.push(line.innerHTML);
+        line.innerHTML = '';
+        line.style.opacity = '0';
+    });
+
+    // Add blinking cursor
+    const cursor = document.createElement('span');
+    cursor.className = 'sys-log-cursor';
+    cursor.textContent = '▮';
+    log.appendChild(cursor);
+
+    let currentLine = 0;
+    let currentChar = 0;
+
+    function typeNext() {
+        if (currentLine >= originals.length) {
+            // All lines typed, keep cursor blinking
+            cursor.style.animation = 'blink-cursor 1s step-end infinite';
+            return;
+        }
+
+        const line = lines[currentLine];
+        const html = originals[currentLine];
+        line.style.opacity = '1';
+
+        if (currentChar === 0) {
+            line.innerHTML = '';
+        }
+
+        // Type one character at a time (handle HTML tags as single units)
+        if (currentChar < html.length) {
+            // Check if we're at a tag
+            if (html[currentChar] === '<') {
+                const tagEnd = html.indexOf('>', currentChar);
+                if (tagEnd !== -1) {
+                    line.innerHTML = html.substring(0, tagEnd + 1);
+                    currentChar = tagEnd + 1;
+                } else {
+                    line.innerHTML = html.substring(0, currentChar + 1);
+                    currentChar++;
+                }
+            } else {
+                line.innerHTML = html.substring(0, currentChar + 1);
+                currentChar++;
+            }
+
+            // Move cursor after current line
+            cursor.remove();
+            line.appendChild(cursor);
+
+            const delay = Math.random() * 25 + 15; // 15-40ms per char
+            setTimeout(typeNext, delay);
+        } else {
+            // Line complete
+            line.innerHTML = html;
+            currentLine++;
+            currentChar = 0;
+
+            if (currentLine < originals.length) {
+                setTimeout(typeNext, 200); // Pause between lines
+            } else {
+                // Done — move cursor to end of last line
+                cursor.remove();
+                const lastLine = lines[lines.length - 1];
+                lastLine.appendChild(cursor);
+                line.appendChild(cursor);
+            }
+        }
+    }
+
+    // Start typing after a short delay
+    setTimeout(typeNext, 400);
+}
+
+// --- STAR DUST BACKGROUND (canvas particle system) ---
+let stardustAnimId = null;
+let stardustParticles = [];
+
+function initStarDust() {
+    // Just init the canvas reference; actual animation starts on toggle
+    const canvas = document.getElementById('stardust-canvas');
+    if (!canvas) return;
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+}
+
+function startStardust() {
+    const canvas = document.getElementById('stardust-canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+
+    // Create particles
+    const count = 80;
+    stardustParticles = [];
+    for (let i = 0; i < count; i++) {
+        stardustParticles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            r: Math.random() * 1.5 + 0.5,
+            vx: (Math.random() - 0.5) * 0.2,
+            vy: (Math.random() - 0.5) * 0.2,
+            alpha: Math.random() * 0.6 + 0.2,
+            pulse: Math.random() * Math.PI * 2
+        });
+    }
+
+    function animate() {
+        if (!canvas.classList.contains('active')) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stardustAnimId = null;
+            return;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const time = Date.now() * 0.001;
+        const intensity = document.body.classList.contains('fx-extreme') ? 1.2 : 0.7;
+
+        stardustParticles.forEach(function(p) {
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Wrap around edges
+            if (p.x < 0) p.x = canvas.width;
+            if (p.x > canvas.width) p.x = 0;
+            if (p.y < 0) p.y = canvas.height;
+            if (p.y > canvas.height) p.y = 0;
+
+            // Pulsing alpha
+            const alpha = (Math.sin(time * 2 + p.pulse) * 0.3 + 0.7) * p.alpha * intensity;
+
+            // Draw particle with glow
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(244, 114, 182, ' + alpha + ')';
+            ctx.fill();
+
+            // Glow halo
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(244, 114, 182, ' + (alpha * 0.15) + ')';
+            ctx.fill();
+        });
+
+        stardustAnimId = requestAnimationFrame(animate);
+    }
+
+    stardustAnimId = requestAnimationFrame(animate);
+}
+
+function stopStardust() {
+    if (stardustAnimId) {
+        cancelAnimationFrame(stardustAnimId);
+        stardustAnimId = null;
+    }
+    const canvas = document.getElementById('stardust-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    stardustParticles = [];
 }
 
 init();

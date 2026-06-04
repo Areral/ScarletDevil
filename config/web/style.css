@@ -1,29 +1,45 @@
 :root {
-    /* Lighter, luxurious Scarlet Mansion Palette */
-    --bg-void: #0f0508; 
-    --bg-surface: rgba(28, 14, 20, 0.65);
-    --bg-card: rgba(38, 18, 28, 0.45);
-    --bg-hover: rgba(56, 24, 40, 0.8);
-    
-    /* Scarlet Devil Accents */
-    --accent: #f43f5e; 
+    /* Scarlet Mansion Palette — Enhanced, more saturated */
+    --bg-void: #0a0306;
+    --bg-surface: rgba(24, 10, 18, 0.72);
+    --bg-card: rgba(34, 14, 24, 0.55);
+    --bg-hover: rgba(56, 22, 38, 0.85);
+
+    /* Scarlet Devil Accents — boosted saturation */
+    --accent: #fb3b5c;
     --touhou-red: #e11d48;
+    --touhou-red-glow: #ff2d55;
     --touhou-crimson: #9f1239;
-    --touhou-purple: #8b5cf6;
+    --touhou-purple: #946cf8;
+    --touhou-purple-glow: #a78bfa;
     --touhou-sakura: #f472b6;
-    
+    --touhou-sakura-glow: #f9a8d4;
+
     --cyber-blue: #38bdf8;
+    --cyber-blue-glow: #7dd3fc;
     --cyber-green: #10b981;
-    
+    --cyber-green-glow: #34d399;
+
     --text-main: #ffffff;
     --text-dim: #cbd5e1;
     --text-dark: #71717a;
-    
+
     --border: rgba(225, 29, 72, 0.15);
     --border-light: rgba(244, 114, 182, 0.3);
-    
+    --border-strong: rgba(225, 29, 72, 0.35);
+
     --glass-blur: blur(20px);
     --trans: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    --trans-fast: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    /* Theme foundation — override via data-theme */
+    --theme-glow-primary: var(--touhou-red-glow);
+    --theme-glow-secondary: var(--touhou-purple-glow);
+    --theme-accent-primary: var(--touhou-red);
+    --theme-accent-secondary: var(--touhou-purple);
+    --theme-bg-void: var(--bg-void);
+    --theme-bg-card: var(--bg-card);
+    --theme-text-accent: var(--touhou-sakura);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -34,18 +50,32 @@ body {
     color: var(--text-main);
     min-height: 100vh;
     display: flex; justify-content: center;
-    background-image: 
-        radial-gradient(circle at 10% 20%, rgba(225, 29, 72, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.06) 0%, transparent 60%),
+    background-image:
+        radial-gradient(circle at 10% 20%, rgba(225, 29, 72, 0.10) 0%, transparent 50%),
+        radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 50% 50%, rgba(244, 114, 182, 0.03) 0%, transparent 70%),
         linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-    background-size: 100% 100%, 100% 100%, 60px 60px, 60px 60px;
+    background-size: 100% 100%, 100% 100%, 100% 100%, 60px 60px, 60px 60px;
     background-attachment: fixed;
     line-height: 1.6;
     overflow-x: hidden;
     scroll-behavior: smooth;
     width: 100vw;
 }
+
+/* Custom scrollbar — mansion colors */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-void); }
+::-webkit-scrollbar-thumb { background: var(--touhou-crimson); border-radius: 4px; border: 2px solid var(--bg-void); }
+::-webkit-scrollbar-thumb:hover { background: var(--touhou-red); }
+::-webkit-scrollbar-corner { background: var(--bg-void); }
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: var(--touhou-crimson) var(--bg-void); }
+
+/* Selection — scarlet glow */
+::selection { background: rgba(225, 29, 72, 0.4); color: #ffffff; text-shadow: 0 0 8px rgba(225, 29, 72, 0.5); }
+::-moz-selection { background: rgba(225, 29, 72, 0.4); color: #ffffff; }
 
 /* CRITICAL */
 .container { 
@@ -82,6 +112,52 @@ h1, h2, h3, h4 { font-weight: 800; letter-spacing: -0.5px; }
     50% { text-shadow: 0 0 25px rgba(225, 29, 72, 0.9), 0 0 50px rgba(244, 114, 182, 0.5); transform: translateY(-3px); }
 }
 
+/* Glitch effect on heading hover */
+@keyframes glitch-skew {
+    0% { transform: translate(0); }
+    15% { transform: translate(-4px, 2px) skew(-1deg); }
+    30% { transform: translate(4px, -1px) skew(1deg); }
+    45% { transform: translate(-2px, -2px); }
+    60% { transform: translate(3px, 1px) skew(-0.5deg); }
+    75% { transform: translate(-1px, 3px); }
+    100% { transform: translate(0); }
+}
+@keyframes glitch-clip {
+    0%, 100% { clip-path: inset(0 0 0 0); }
+    20% { clip-path: inset(20% 0 60% 0); }
+    40% { clip-path: inset(60% 0 20% 0); }
+    60% { clip-path: inset(40% 0 30% 0); }
+    80% { clip-path: inset(10% 0 70% 0); }
+}
+h1:hover, h2:hover, .hero h1:hover span {
+    animation: glitch-skew 0.4s ease-in-out;
+    text-shadow:
+        2px 0 rgba(225, 29, 72, 0.7),
+        -2px 0 rgba(56, 189, 248, 0.7);
+}
+
+/* Neon outline on focus */
+*:focus-visible {
+    outline: 2px solid var(--touhou-sakura);
+    outline-offset: 3px;
+    box-shadow: 0 0 15px rgba(244, 114, 182, 0.5), 0 0 30px rgba(225, 29, 72, 0.2);
+    border-radius: 6px;
+    transition: outline-color 0.2s, box-shadow 0.2s;
+}
+
+/* Blinking cursor for sys-log */
+@keyframes blink-cursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+.sys-log-cursor {
+    display: inline;
+    color: var(--touhou-sakura);
+    font-weight: 700;
+    animation: blink-cursor 1s step-end infinite;
+    margin-left: 2px;
+}
+
 /* Effects Animations */
 .danmaku-bullet {
     position: fixed;
@@ -108,15 +184,31 @@ h1, h2, h3, h4 { font-weight: 800; letter-spacing: -0.5px; }
     inset: 0;
     pointer-events: none;
     z-index: 1;
-    background: radial-gradient(circle at 50% 120%, rgba(225, 29, 72, 0.15) 0%, transparent 70%);
+    background:
+        radial-gradient(circle at 50% 120%, rgba(225, 29, 72, 0.18) 0%, transparent 60%),
+        radial-gradient(circle at 20% 70%, rgba(139, 92, 246, 0.10) 0%, transparent 55%),
+        radial-gradient(circle at 80% 40%, rgba(244, 114, 182, 0.08) 0%, transparent 50%);
     opacity: 0;
     transition: opacity 1.5s ease;
     animation: mist-pulse 6s infinite alternate ease-in-out;
 }
+.scarlet-mist-layer::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+        radial-gradient(circle at 30% 90%, rgba(225, 29, 72, 0.12) 0%, transparent 45%),
+        radial-gradient(circle at 70% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 40%);
+    animation: mist-drift 12s infinite alternate ease-in-out;
+}
 .scarlet-mist-layer.active { opacity: 1; }
 @keyframes mist-pulse {
-    0% { transform: scale(1) translateY(0); }
-    100% { transform: scale(1.05) translateY(-2vh); }
+    0% { transform: scale(1) translateY(0); opacity: 0.6; }
+    100% { transform: scale(1.08) translateY(-3vh); opacity: 1; }
+}
+@keyframes mist-drift {
+    0% { transform: translateX(-2vw) translateY(1vh); }
+    50% { transform: translateX(3vw) translateY(-2vh); }
+    100% { transform: translateX(-1vw) translateY(1.5vh); }
 }
 
 /* --- INTERACTIVE FUN PANEL --- */
@@ -621,58 +713,73 @@ section:last-of-type { border-bottom: none; }
 /* --- SUB CARDS --- */
 .sub-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .sub-card {
-    background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 20px;
-    cursor: pointer; transition: var(--trans); display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden;
+    background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-left: 4px solid transparent; border-radius: 16px; padding: 20px;
+    cursor: pointer; transition: var(--trans); display: flex; flex-direction: column; gap: 10px; position: relative; overflow: visible;
 }
-.sub-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: transparent; transition: 0.4s; }
+.sub-card::before {
+    content: ''; position: absolute;
+    inset: -2px;
+    border-radius: 17px;
+    background: conic-gradient(from 0deg, var(--touhou-red), var(--touhou-purple), var(--touhou-sakura), var(--cyber-blue), var(--touhou-red));
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    animation: border-spin 4s linear infinite;
+    animation-play-state: paused;
+}
+.sub-card::after {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border-radius: 15px;
+    background: var(--bg-void);
+    z-index: -1;
+}
 .sub-card:hover { transform: translateX(5px); background: rgba(255,255,255,0.02); }
+.sub-card:hover::before { opacity: 0.8; animation-play-state: running; }
 
-.sub-card.reality { border-color: rgba(139, 92, 246, 0.3); }
-.sub-card.reality::before { background: var(--touhou-purple); }
+@keyframes border-spin {
+    100% { transform: rotate(360deg); }
+}
+
+.sub-card.reality { border-color: rgba(139, 92, 246, 0.3); border-left-color: var(--touhou-purple); }
 .sub-card.reality:hover { border-color: var(--touhou-purple); box-shadow: 0 0 30px rgba(139, 92, 246, 0.15); }
 
-.sub-card.fast { border-color: rgba(16, 185, 129, 0.3); }
-.sub-card.fast::before { background: var(--cyber-green); }
+.sub-card.fast { border-color: rgba(16, 185, 129, 0.3); border-left-color: var(--cyber-green); }
 .sub-card.fast:hover { border-color: var(--cyber-green); box-shadow: 0 0 30px rgba(16, 185, 129, 0.15); }
 
-.sub-card.mix { border-color: rgba(225, 29, 72, 0.3); }
-.sub-card.mix::before { background: var(--touhou-red); }
+.sub-card.mix { border-color: rgba(225, 29, 72, 0.3); border-left-color: var(--touhou-red); }
 .sub-card.mix:hover { border-color: var(--touhou-red); box-shadow: 0 0 30px rgba(225, 29, 72, 0.15); }
 
-.sub-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
-.sub-title { font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 8px; }
-.sub-badge { font-size: 0.6rem; padding: 4px 8px; border-radius: 6px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+.sub-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1; }
+.sub-title { font-weight: 800; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
+.sub-badge { font-size: 0.6rem; padding: 4px 8px; border-radius: 6px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; position: relative; z-index: 1; }
 .badge-reality { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
 .badge-fast { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
 .badge-mix { background: rgba(225, 29, 72, 0.15); color: #fda4af; border: 1px solid rgba(225, 29, 72, 0.3); }
 
-.sub-card.vless { border-color: rgba(139, 92, 246, 0.3); }
-.sub-card.vless::before { background: var(--touhou-purple); }
+.sub-card.vless { border-color: rgba(139, 92, 246, 0.3); border-left-color: var(--touhou-purple); }
 .sub-card.vless:hover { border-color: var(--touhou-purple); box-shadow: 0 0 30px rgba(139, 92, 246, 0.15); }
 .badge-vless { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
 
-.sub-card.vmess { border-color: rgba(56, 189, 248, 0.3); }
-.sub-card.vmess::before { background: var(--cyber-blue); }
+.sub-card.vmess { border-color: rgba(56, 189, 248, 0.3); border-left-color: var(--cyber-blue); }
 .sub-card.vmess:hover { border-color: var(--cyber-blue); box-shadow: 0 0 30px rgba(56, 189, 248, 0.15); }
 .badge-vmess { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.3); }
 
-.sub-card.trojan { border-color: rgba(250, 204, 21, 0.3); }
-.sub-card.trojan::before { background: #facc15; }
+.sub-card.trojan { border-color: rgba(250, 204, 21, 0.3); border-left-color: #facc15; }
 .sub-card.trojan:hover { border-color: #facc15; box-shadow: 0 0 30px rgba(250, 204, 21, 0.15); }
 .badge-trojan { background: rgba(250, 204, 21, 0.15); color: #fde047; border: 1px solid rgba(250, 204, 21, 0.3); }
 
-.sub-card.ss { border-color: rgba(16, 185, 129, 0.3); }
-.sub-card.ss::before { background: var(--cyber-green); }
+.sub-card.ss { border-color: rgba(16, 185, 129, 0.3); border-left-color: var(--cyber-green); }
 .sub-card.ss:hover { border-color: var(--cyber-green); box-shadow: 0 0 30px rgba(16, 185, 129, 0.15); }
 .badge-ss { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
 
-.sub-card.hy2 { border-color: rgba(244, 114, 182, 0.3); }
-.sub-card.hy2::before { background: var(--touhou-sakura); }
+.sub-card.hy2 { border-color: rgba(244, 114, 182, 0.3); border-left-color: var(--touhou-sakura); }
 .sub-card.hy2:hover { border-color: var(--touhou-sakura); box-shadow: 0 0 30px rgba(244, 114, 182, 0.15); }
 .badge-hy2 { background: rgba(244, 114, 182, 0.15); color: #f9a8d4; border: 1px solid rgba(244, 114, 182, 0.3); }
 
-.sub-desc { font-size: 0.85rem; color: var(--text-dim); line-height: 1.4; }
-.sub-tech { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-dark); margin-top: 4px; font-weight: 700;}
+.sub-desc { font-size: 0.85rem; color: var(--text-dim); line-height: 1.4; position: relative; z-index: 1; }
+.sub-tech { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-dark); margin-top: 4px; font-weight: 700; position: relative; z-index: 1; }
 
 /* --- MODALS --- */
 .modal-overlay {
@@ -862,19 +969,23 @@ section:last-of-type { border-bottom: none; }
 /* --- RU-VERIFIED CARD --- */
 .sub-card.ru-verified {
     border-color: rgba(251, 191, 36, 0.5);
+    border-left: 5px solid #fbbf24;
+    border-left-color: #fbbf24;
     background: rgba(251, 191, 36, 0.04);
     box-shadow: 0 0 20px rgba(251, 191, 36, 0.08), inset 0 0 30px rgba(251, 191, 36, 0.03);
 }
 .sub-card.ru-verified::before {
-    background: linear-gradient(to bottom, #fbbf24, #f59e0b);
-    width: 5px;
-    box-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
+    /* Override the rotating border for RU card — use golden glow instead */
+    background: conic-gradient(from 0deg, #fbbf24, #f59e0b, #fbbf24);
+    opacity: 0.3;
+    animation-play-state: running;
 }
 .sub-card.ru-verified:hover {
     border-color: #fbbf24;
     box-shadow: 0 0 30px rgba(251, 191, 36, 0.25);
     transform: translateX(5px);
 }
+.sub-card.ru-verified:hover::before { opacity: 0.7; }
 .badge-ru {
     background: rgba(251, 191, 36, 0.15);
     color: #fbbf24;
@@ -952,4 +1063,196 @@ section:last-of-type { border-bottom: none; }
     .sub-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* ═══════════════════════════════════════════════
+   US-W06 — TOUHOU/CYBERPUNK VISUAL ENHANCEMENTS
+   ═══════════════════════════════════════════════ */
+
+/* --- SCANLINE OVERLAY --- */
+.scanline-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.04) 2px,
+        rgba(0, 0, 0, 0.04) 4px
+    );
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+.scanline-overlay.active { opacity: 1; }
+/* Extreme intensity — more visible scanlines */
+.fx-extreme .scanline-overlay.active {
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 1px,
+        rgba(0, 0, 0, 0.06) 1px,
+        rgba(0, 0, 0, 0.06) 2px
+    );
+}
+
+/* --- STAR DUST CANVAS --- */
+.stardust-canvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 1s ease;
+}
+.stardust-canvas.active { opacity: 0.7; }
+.fx-extreme .stardust-canvas.active { opacity: 1; }
+
+/* --- EFFECT INTENSITY CONTROL --- */
+.fx-control {
+    position: fixed;
+    bottom: 200px;
+    left: 30px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+@media (max-width: 1024px) {
+    .fx-control {
+        bottom: auto;
+        top: 16px;
+        left: 16px;
+    }
+}
+.fx-toggle {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    background: var(--bg-surface);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 900;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: var(--trans);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+    display: flex; align-items: center; justify-content: center;
+}
+.fx-toggle:hover {
+    background: rgba(225, 29, 72, 0.2);
+    color: var(--touhou-sakura);
+    border-color: var(--touhou-sakura);
+    box-shadow: 0 0 12px rgba(225, 29, 72, 0.2);
+}
+.fx-label {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dark);
+    font-weight: 800;
+    text-align: center;
+}
+
+/* --- INTENSITY-DEPENDENT EFFECTS --- */
+
+/* Minimal: reduce motion, hide extras */
+.fx-minimal .scanline-overlay { display: none; }
+.fx-minimal .stardust-canvas { display: none; }
+.fx-minimal h1:hover, .fx-minimal h2:hover { animation: none; }
+.fx-minimal .sub-card::before { display: none; }
+.fx-minimal .scarlet-mist-layer { transition: opacity 0.3s ease; }
+.fx-minimal .scarlet-mist-layer::before { display: none; }
+
+/* Normal (default): all effects available at standard intensity */
+/* Extreme: enhanced effects */
+.fx-extreme .scarlet-mist-layer.active {
+    animation: mist-pulse 4s infinite alternate ease-in-out;
+}
+.fx-extreme .scarlet-mist-layer.active::before {
+    animation: mist-drift 6s infinite alternate ease-in-out;
+}
+.fx-extreme h1:hover, .fx-extreme h2:hover {
+    text-shadow:
+        2px 0 var(--touhou-red),
+        -2px 0 var(--cyber-blue);
+    animation: glitch-skew 0.3s ease-in-out infinite;
+}
+.fx-extreme .sub-card:hover::before { opacity: 1; }
+
+/* --- MIST PARTICLES (extreme only) --- */
+.mist-particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(225, 29, 72, 0.4) 0%, transparent 70%);
+    animation: particle-float linear forwards;
+}
+@keyframes particle-float {
+    0% { transform: translateY(0) translateX(0) scale(0); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 0.5; }
+    100% { transform: translateY(-40vh) translateX(var(--px)) scale(1.2); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════
+   THEME FOUNDATION — CSS Variables for Themes
+   ═══════════════════════════════════════════════ */
+
+/* Theme: Midnight (data-theme="midnight") */
+[data-theme="midnight"] {
+    --bg-void: #020510;
+    --bg-surface: rgba(10, 16, 36, 0.72);
+    --bg-card: rgba(16, 22, 44, 0.55);
+    --bg-hover: rgba(24, 32, 58, 0.85);
+    --accent: #3b82f6;
+    --touhou-red: #2563eb;
+    --touhou-red-glow: #3b82f6;
+    --touhou-crimson: #1e40af;
+    --touhou-purple: #6366f1;
+    --touhou-purple-glow: #818cf8;
+    --touhou-sakura: #60a5fa;
+    --touhou-sakura-glow: #93c5fd;
+    --cyber-blue: #38bdf8;
+    --cyber-blue-glow: #7dd3fc;
+    --cyber-green: #10b981;
+    --cyber-green-glow: #34d399;
+    --border: rgba(59, 130, 246, 0.15);
+    --border-light: rgba(96, 165, 250, 0.3);
+    --theme-glow-primary: var(--touhou-red-glow);
+    --theme-glow-secondary: var(--touhou-purple-glow);
+    --theme-accent-primary: var(--touhou-red);
+    --theme-accent-secondary: var(--touhou-purple);
+    --theme-text-accent: var(--touhou-sakura);
+}
+
+/* Theme: Sakura (data-theme="sakura") */
+[data-theme="sakura"] {
+    --bg-void: #12050a;
+    --bg-surface: rgba(30, 14, 24, 0.72);
+    --bg-card: rgba(42, 18, 32, 0.55);
+    --bg-hover: rgba(58, 24, 44, 0.85);
+    --accent: #f9a8d4;
+    --touhou-red: #f472b6;
+    --touhou-red-glow: #f9a8d4;
+    --touhou-crimson: #be185d;
+    --touhou-purple: #c084fc;
+    --touhou-purple-glow: #d8b4fe;
+    --touhou-sakura: #fda4af;
+    --touhou-sakura-glow: #fecdd3;
+    --cyber-blue: #67e8f9;
+    --cyber-blue-glow: #a5f3fc;
+    --cyber-green: #34d399;
+    --cyber-green-glow: #6ee7b7;
+    --border: rgba(244, 114, 182, 0.15);
+    --border-light: rgba(249, 168, 212, 0.3);
+    --theme-glow-primary: var(--touhou-red-glow);
+    --theme-glow-secondary: var(--touhou-purple-glow);
+    --theme-accent-primary: var(--touhou-red);
+    --theme-accent-secondary: var(--touhou-purple);
+    --theme-text-accent: var(--touhou-sakura);
 }

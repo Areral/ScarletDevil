@@ -32,6 +32,12 @@
     <!-- SCARLET MIST LAYER (Easter Egg) -->
     <div id="mist-layer" class="scarlet-mist-layer"></div>
 
+    <!-- SCANLINE OVERLAY (fun-panel toggle) -->
+    <div id="scanline-overlay" class="scanline-overlay"></div>
+
+    <!-- STAR DUST CANVAS (fun-panel toggle) -->
+    <canvas id="stardust-canvas" class="stardust-canvas"></canvas>
+
     <!-- БОКОВАЯ НАВИГАЦИЯ -->
     <nav class="side-nav">
         <button class="nav-btn active" data-target="home" aria-label="Перейти к главной секции">
@@ -65,6 +71,14 @@
         <button id="btn-mist" class="fun-btn" title="Алый туман" aria-label="Включить алый туман"><i class="fa-solid fa-cloud"></i></button>
         <button id="btn-danmaku" class="fun-btn" title="Даммаку" aria-label="Включить даммаку"><i class="fa-solid fa-meteor"></i></button>
         <button id="btn-bats" class="fun-btn" title="Духи особняка" aria-label="Включить духов особняка"><i class="fa-solid fa-ghost"></i></button>
+        <button id="btn-scanline" class="fun-btn" title="Скан-линии CRT" aria-label="Включить скан-линии"><i class="fa-solid fa-barcode"></i></button>
+        <button id="btn-stardust" class="fun-btn" title="Звёздная пыль" aria-label="Включить звёздную пыль"><i class="fa-solid fa-sparkles"></i></button>
+    </div>
+
+    <!-- EFFECT INTENSITY CONTROL -->
+    <div class="fx-control reveal" id="fx-control">
+        <button class="fx-toggle" id="fx-toggle" title="Интенсивность эффектов" aria-label="Переключить интенсивность эффектов">N</button>
+        <span class="fx-label">FX</span>
     </div>
 
     <!-- HAMBURGER BUTTON (mobile only) -->
@@ -95,6 +109,8 @@
                     <button id="btn-mist-mobile" class="fun-btn-mobile" aria-label="Алый туман" title="Алый туман"><i class="fa-solid fa-cloud"></i></button>
                     <button id="btn-danmaku-mobile" class="fun-btn-mobile" aria-label="Даммаку" title="Даммаку"><i class="fa-solid fa-meteor"></i></button>
                     <button id="btn-bats-mobile" class="fun-btn-mobile" aria-label="Духи особняка" title="Духи особняка"><i class="fa-solid fa-ghost"></i></button>
+                    <button id="btn-scanline-mobile" class="fun-btn-mobile" aria-label="Скан-линии" title="Скан-линии"><i class="fa-solid fa-barcode"></i></button>
+                    <button id="btn-stardust-mobile" class="fun-btn-mobile" aria-label="Звёздная пыль" title="Звёздная пыль"><i class="fa-solid fa-sparkles"></i></button>
                 </div>
             </div>
         </div>
