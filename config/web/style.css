@@ -472,3 +472,17 @@ section:last-of-type { border-bottom: none; }
 .footer { text-align: center; color: var(--text-dark); font-size: 0.8rem; padding: 30px 0 20px 0; font-weight: 700; width: 100%; }
 .footer a { color: var(--text-dim); text-decoration: none; transition: 0.3s; border-bottom: 1px solid var(--border); padding-bottom: 2px;}
 .footer a:hover { color: var(--touhou-sakura); border-color: var(--touhou-sakura); }
+
+/* Protocol Badges (App Cards) */
+.proto-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: var(--touhou-sakura);
+    border: 1px solid var(--border-light);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
