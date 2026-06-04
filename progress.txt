@@ -199,3 +199,40 @@ Started:  4 июн 2026 г. 23:08:39
 - **CHAMPION_TOP_N tradeoff:** Увеличение с 5 до 20 даёт более репрезентативные данные о топ-скоростях, но каждый champion-узел тестируется отдельным sing-box процессом с 10MB загрузкой. 20 чемпионов × ~35s/batch = до 700s дополнительно к общему времени дрона.
 - **index.html regeneration after template changes:** Любое изменение template.html/style.css/main.js требует регенерации index.html. Это уже учтено в workflow.
 ---
+
+## 2026-06-05 - US-C06: Улучшение стилизации hero-секции и кнопок
+
+### Что сделано
+
+1. **Переписан .hero-actions layout (mobile-first) в style.css:**
+   - БАГ: `.btn-primary` имеет `width: 100%`, что внутри flex-контейнера `.hero-actions`
+     заставляло wizard-кнопку переноситься на новую строку ДАЖЕ на десктопе → кнопки
+     стекались вертикально вместо горизонтального расположения.
+   - Mobile (<768px): `flex-direction: column; align-items: stretch` — кнопки вертикально, полная ширина.
+   - Desktop (>=768px): `flex-direction: row; flex-wrap: wrap` + `.btn-primary`/`.wizard-cta-wrap`/`.btn-wizard`
+     получают `width: auto` → горизонтальное расположение по содержимому.
+   - Удалён старый брейкпоинт `@media (min-width: 600px)` (justify-content only).
+
+2. **Анимированная иконка fa-hat-wizard:**
+   - `.btn-wizard.pulse-hint i` → keyframe `wizard-icon-bob` (translateY + rotate) при первом визите.
+   - `.btn-wizard:hover i` → rotate(-12deg) scale(1.12) с transition.
+
+3. **Onboard-bubble (первый визит):**
+   - Уже корректно реализован в `initOnboarding()` (main.js): проверяет `localStorage sd_visited`,
+     показывает bubble + pulse-hint только если не посещал. Изменений не потребовалось.
+
+### Изменённые файлы
+
+- `config/web/style.css` — .hero-actions mobile-first, width:auto на десктопе, wizard-icon-bob анимация
+- `index.html` — regenerated
+- `prd.json` — US-C06 passes: true
+
+### Learnings for future iterations:
+- **flex-wrap + width:100% child = forced wrap.** Если flex-ребёнок имеет `width:100%`, он занимает
+  всю строку и со `flex-wrap: wrap` выталкивает соседей вниз. Для горизонтального layout на десктопе
+  нужно явно сбрасывать `width: auto` у детей в брейкпоинте, а не только менять `justify-content`.
+- **Mobile-first брейкпоинты:** базовые стили = мобильный (column/stretch), `@media (min-width: 768px)`
+  переопределяет на десктоп (row/auto). Согласуется с порогом 768px из acceptance criteria.
+- **fa-sparkles vs fa-wand-magic-sparkles:** в hero onboard-bubble используется fa-wand-magic-sparkles,
+  в fun-panel stardust — fa-sparkles. Не путать.
+---

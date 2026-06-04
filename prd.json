@@ -120,8 +120,8 @@
         "Визуальная проверка: открыть index.html на 375×812 (iPhone), 1366×768 (Desktop)"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": "В template.html уже есть .hero-actions div с двумя кнопками. Нужно проверить CSS-стили в style.css для .hero-actions."
+      "passes": true,
+      "notes": "✅ 2026-06-05: .hero-actions переписан mobile-first: column/full-width на <768px, row/auto-width на >=768px. Убран баг где .btn-primary (width:100%) форсировал перенос wizard-кнопки вниз даже на десктопе. .btn-primary и .btn-wizard получают width:auto в десктоп-брейкпоинте. Добавлена анимация иконки fa-hat-wizard: wizard-icon-bob при pulse-hint (первый визит) + rotate/scale на hover. Onboard-bubble уже показывался только при первом визите (localStorage sd_visited в initOnboarding). index.html регенерирован, node --check OK."
     },
     {
       "id": "US-C07",

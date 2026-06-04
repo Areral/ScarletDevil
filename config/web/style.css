@@ -1444,16 +1444,32 @@ section:last-of-type { border-bottom: none; }
 }
 
 /* --- SETUP WIZARD (US-W10) --- */
+/* Mobile-first: stack hero buttons vertically, full width (<768px) */
 .hero-actions {
-    display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; gap: 14px; align-items: stretch;
 }
-@media (min-width: 600px) { .hero-actions { justify-content: flex-start; } }
+.hero-actions .wizard-cta-wrap { width: 100%; }
+.hero-actions .wizard-cta-wrap .btn-wizard { width: 100%; }
 
-.btn-wizard i { color: var(--touhou-sakura); }
+/* Desktop (>=768px): lay buttons out horizontally, sized to content */
+@media (min-width: 768px) {
+    .hero-actions { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
+    .hero-actions .btn-primary { width: auto; }
+    .hero-actions .wizard-cta-wrap { width: auto; }
+    .hero-actions .wizard-cta-wrap .btn-wizard { width: auto; }
+}
+
+.btn-wizard i { color: var(--touhou-sakura); transition: transform 0.3s ease; }
+.btn-wizard:hover i { transform: rotate(-12deg) scale(1.12); }
 .btn-wizard.pulse-hint { animation: wizard-pulse 2s ease-in-out infinite; }
+.btn-wizard.pulse-hint i { animation: wizard-icon-bob 1.6s ease-in-out infinite; }
 @keyframes wizard-pulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
     50% { box-shadow: 0 0 0 8px rgba(225, 29, 72, 0.12); border-color: var(--touhou-red); }
+}
+@keyframes wizard-icon-bob {
+    0%, 100% { transform: translateY(0) rotate(0); }
+    50% { transform: translateY(-3px) rotate(-8deg); }
 }
 
 /* Onboarding hint bubble */
