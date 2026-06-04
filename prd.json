@@ -102,7 +102,7 @@
         "Workflow YAML is valid (parses with `python -c \"import yaml,sys; yaml.safe_load(open('.github/workflows/update.yml'))\"`)"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "AUDIT.md §2.6"
     },
     {

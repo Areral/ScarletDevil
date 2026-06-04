@@ -207,3 +207,40 @@ Started: Thu Jun  4 04:19:02 RTZ 2026
   nodes in that /24 (even across different batches) reuse the result.
 ---
 
+## Thu Jun  4 - US-007 (Publish output to a dedicated branch, no force-push on main)
+- Replaced amend+force-push on `main` with normal commit+push to `gh-pages`
+  orphan branch (AUDIT §2.6).
+- `.github/workflows/update.yml`:
+  - Replaced "⭰ Sync & Deploy" step with "⭰ Publish to gh-pages".
+  - Saves generated files (`sub_all.txt`, `sub_bs.txt`, `sub_chs.txt`,
+    `index.html`, `vercel.json`) to `/tmp/publish/` before switching branches.
+  - Creates `gh-pages` as an orphan branch on first run, otherwise cleans and
+    re-populates it.
+  - Uses normal `git commit` + `git push origin gh-pages` — **no amend, no
+    force-push** against main (or any branch).
+- `vercel.json`: Added `//` comment noting the deploy target branch
+  (`gh-pages`) and that it's synced by CI.
+- `README.md`: Added "🚀 Деплой (Deployment)" section documenting the
+  `gh-pages` → Vercel pipeline and the Vercel dashboard setting needed.
+- `AUDIT.md` §2.6: Updated to note the fix (US-007, выполнено).
+- **Checks:** `python -c "import yaml,sys; yaml.safe_load(open('.github/workflows/update.yml', encoding='utf-8'))"` OK
+  (2 jobs: matrix-crawler, matrix-merge). `python -m py_compile main.py merge.py
+  parse_only.py core/*.py` OK. `vercel.json` valid JSON. No `amend` or `force`
+  in the workflow (except our own comment).
+- **Learnings for future iterations:**
+  - GitHub Actions `actions/checkout@v4` with `fetch-depth: 0` fetches all
+    branches — `git ls-remote --heads origin gh-pages` is the reliable way to
+    check if a remote branch exists before trying to check it out.
+  - `git checkout --orphan gh-pages` creates a branch with no history; combine
+    with `git rm -rf --quiet . || true` to get an empty working tree on first
+    run. Subsequent runs use `find . -maxdepth 1 ... -exec rm -rf {} \;` to
+    clean the working tree while preserving `.git`.
+  - Vercel's `vercel.json` lives on the deployed branch (`gh-pages`), not on
+    the source branch (`main`). The CI step copies it to `gh-pages` each run so
+    it stays in sync — manual edits to `vercel.json` in `main` propagate
+    automatically on the next CI run.
+  - When switching branches mid-job, save generated artifacts to a temp
+    location first (`/tmp/publish/`) — `git checkout` replaces the working
+    tree, so any files only in the working tree (not committed) are lost.
+---
+

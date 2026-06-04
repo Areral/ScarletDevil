@@ -107,16 +107,29 @@ jobs:
           TG_TOPIC_ID: ${{ secrets.TG_TOPIC_ID }}
         run: python merge.py
 
-      - name: ⭰ Sync & Deploy
+      - name: ⭰ Publish to gh-pages
         run: |
           git config --global user.name "Scarlet Devil Bot"
           git config --global user.email "bot@scarletdevil.net"
-          git add index.html sub_all.txt sub_bs.txt sub_chs.txt
-          
-          if git diff --staged --quiet; then
-            exit 0
+
+          # Save generated files before switching branches
+          mkdir -p /tmp/publish
+          cp sub_all.txt sub_bs.txt sub_chs.txt index.html vercel.json /tmp/publish/
+
+          # Switch to gh-pages (create orphan if first run)
+          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+            git fetch origin gh-pages
+            git checkout gh-pages
+            find . -maxdepth 1 -not -name '.git' -not -name '.' -exec rm -rf {} \;
+          else
+            git checkout --orphan gh-pages
+            git rm -rf --quiet . || true
           fi
-          
-          git commit --amend -m "⏣ Scarlet Matrix Sync: $(date -u)" || git commit -m "⏣ Scarlet Matrix Sync: $(date -u)"
-          git push --force
-          
+
+          # Restore published files
+          cp /tmp/publish/* .
+
+          # Normal commit — no amend, no force-push on main
+          git add sub_all.txt sub_bs.txt sub_chs.txt index.html vercel.json
+          git commit -m "⏣ Scarlet Matrix Sync: $(date -u)" || exit 0
+          git push origin gh-pages

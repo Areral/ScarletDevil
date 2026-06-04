@@ -1,4 +1,5 @@
 {
+  "//": "Deploy target: gh-pages branch (set in Vercel dashboard → Settings → Git → Production Branch). This file is synced to gh-pages by the publish step in .github/workflows/update.yml.",
   "rewrites": [
     { "source": "/sub", "destination": "/sub_all.txt" },
     { "source": "/sub1", "destination": "/sub_bs.txt" },
