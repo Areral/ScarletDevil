@@ -44,7 +44,7 @@
         "Already-tracked source files remain tracked (no source accidentally ignored)"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "AUDIT.md §2.12"
     },
     {

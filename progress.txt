@@ -44,6 +44,26 @@ Started: Thu Jun  4 04:19:02 RTZ 2026
 - **Learnings for future iterations:** see ## Codebase Patterns above.
 ---
 
+## Thu Jun  4 - US-003 (Add .gitignore for build/runtime artifacts)
+- Created root `.gitignore` (AUDIT §2.12) ignoring: `data/`,
+  `go_core/angra_core`, `go_core/angra_core.exe`, `*.log`, `__pycache__/`,
+  `*.pyc`, `.last-branch`, `archive/`.
+- Verified by creating each artifact path (data/*.json, run.log, the two
+  angra_core binaries, archive/old.txt) then `git status --porcelain` — only
+  `.gitignore` itself shows as untracked; the previously-untracked
+  `__pycache__/`, `core/__pycache__/`, and `.last-branch` are now ignored.
+- Confirmed no tracked source is caught: `git check-ignore main.py
+  core/util.py go_core/main.go` matches nothing; all 33 tracked files remain.
+- **Files changed:** `.gitignore` (new).
+- **Learnings for future iterations:**
+  - No pre-existing `.gitignore` existed; the repo had been committing source
+    only. `data/` is the Python<->Go IPC handoff dir (go_in_*/go_out_*.json) and
+    is purely runtime — safe to ignore wholesale.
+  - `git check-ignore <path>` is the precise way to prove a path is/ isn't
+    ignored; `git status --porcelain` after touching artifacts proves nothing
+    leaks in.
+---
+
 ## Thu Jun  4 - US-002 (Remove dead code and extract shared UUID util)
 - Extracted the duplicated UUID validator into `core/util.py` as a module-level
   `is_valid_uuid(val) -> bool` (AUDIT §2.5).
