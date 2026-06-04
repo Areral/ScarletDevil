@@ -5,10 +5,12 @@ import urllib.parse
 import ipaddress
 import re
 import html
+import os
+import time
 import asyncio
 import hashlib
 import uuid
-from typing import List, Optional
+from typing import List, Dict, Optional
 import aiohttp
 from loguru import logger
 
@@ -34,6 +36,141 @@ VALID_FINGERPRINTS = {
 }
 
 _SUBSCRIPTION_PROTOCOLS = ("vless://", "vmess://", "trojan://", "ss://", "hysteria://", "hysteria2://", "hy2://")
+
+
+class SourceHealth:
+    """Persistent source health tracking.
+
+    Tracks consecutive failures per subscription source. Sources with >5
+    consecutive zero-alive runs are excluded for 24 hours. Yields are computed
+    from cumulative parsed/alive counts across all runs.
+
+    State is persisted to ``data/source_health.json`` — each drone writes its
+    own shard file (``data/source_health_{shard_idx}.json``) and the merge step
+    reconciles them into the canonical file.
+    """
+
+    _HEALTH_FILE = "data/source_health.json"
+    _MAX_FAILURES = 5
+    _EXCLUSION_HOURS = 24
+
+    def __init__(self, shard_index: int = -1):
+        self._shard = shard_index
+        self.health: Dict[str, dict] = {}
+        self._load()
+
+    # ------------------------------------------------------------------
+    # Persistence
+    # ------------------------------------------------------------------
+
+    def _health_path(self) -> str:
+        """Canonical path when *not* a shard write, shard path otherwise."""
+        if self._shard >= 0:
+            return f"data/source_health_{self._shard}.json"
+        return self._HEALTH_FILE
+
+    def _load(self) -> None:
+        path = self._HEALTH_FILE  # always read from canonical file
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    self.health = json.load(f)
+                logger.debug(f"SourceHealth: loaded {len(self.health)} entries from {path}")
+            except Exception:
+                self.health = {}
+        else:
+            self.health = {}
+
+    def save(self) -> None:
+        os.makedirs("data", exist_ok=True)
+        path = self._health_path()
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self.health, f, indent=2)
+            logger.debug(f"SourceHealth: saved {len(self.health)} entries → {path}")
+        except Exception as exc:
+            logger.warning(f"SourceHealth: failed to save {path}: {exc}")
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    def is_excluded(self, url: str) -> bool:
+        """Return True if the source is currently excluded due to failures."""
+        entry = self.health.get(url, {})
+        excluded_until = entry.get("excluded_until", 0)
+        if excluded_until and time.time() < excluded_until:
+            return True
+        # Expire stale exclusion
+        if excluded_until and time.time() >= excluded_until:
+            entry.pop("excluded_until", None)
+            entry["consecutive_failures"] = 0
+            self.health[url] = entry
+        return False
+
+    def get_yield_pct(self, url: str) -> float:
+        """Historical yield percentage (alive / parsed * 100)."""
+        entry = self.health.get(url, {})
+        total = entry.get("total_parsed", 0)
+        if total == 0:
+            return 0.0
+        return entry.get("total_alive", 0) / total * 100
+
+    def get_all_yields(self) -> Dict[str, dict]:
+        """Return per-source yield snapshot for telemetry export."""
+        return {
+            url: {
+                "parsed": e.get("total_parsed", 0),
+                "alive": e.get("total_alive", 0),
+                "yield_pct": round(self.get_yield_pct(url), 1),
+                "consecutive_failures": e.get("consecutive_failures", 0),
+            }
+            for url, e in self.health.items()
+        }
+
+    def filter_active(self, sources: List[str]) -> List[str]:
+        """Return only sources that are not currently excluded."""
+        excluded = [s for s in sources if self.is_excluded(s)]
+        if excluded:
+            logger.info(
+                f"SourceHealth: excluding {len(excluded)} dead sources: "
+                f"{[s[:60] + '...' if len(s) > 60 else s for s in excluded]}"
+            )
+        return [s for s in sources if not self.is_excluded(s)]
+
+    # ------------------------------------------------------------------
+    # Mutation
+    # ------------------------------------------------------------------
+
+    def record(self, url: str, parsed: int, alive: int) -> None:
+        """Record one drone-run result for a source URL."""
+        now = time.time()
+        entry = self.health.get(url, {})
+        # Running totals (cumulative across runs — reset on success)
+        entry["total_parsed"] = entry.get("total_parsed", 0) + parsed
+        entry["total_alive"] = entry.get("total_alive", 0) + alive
+        entry["last_check"] = now
+
+        if alive == 0:
+            entry["consecutive_failures"] = entry.get("consecutive_failures", 0) + 1
+            if entry["consecutive_failures"] >= self._MAX_FAILURES:
+                entry["excluded_until"] = now + self._EXCLUSION_HOURS * 3600
+                logger.warning(
+                    f"SourceHealth: EXCLUDED for {self._EXCLUSION_HOURS}h — "
+                    f"{entry['consecutive_failures']} consecutive failures → {url[:80]}"
+                )
+        else:
+            # Source produced at least one alive node → reset failure counter
+            if entry.get("consecutive_failures", 0) > 0:
+                logger.info(
+                    f"SourceHealth: recovered! {url[:80]} "
+                    f"(had {entry['consecutive_failures']} failures)"
+                )
+            entry["consecutive_failures"] = 0
+            entry.pop("excluded_until", None)
+            entry["last_success"] = now
+
+        self.health[url] = entry
 
 
 class LinkParser:
@@ -505,7 +642,7 @@ class LinkParser:
                         continue
             return ""
 
-    async def fetch_and_parse(self) -> List[ProxyNode]:
+    async def fetch_and_parse(self, source_health: Optional['SourceHealth'] = None) -> List[ProxyNode]:
         max_accounts_per_server = CONFIG.parser.get("max_accounts_per_server", 5)
         raw_sources = CONFIG.SUBSCRIPTION_SOURCES
         if not raw_sources:
@@ -515,6 +652,10 @@ class LinkParser:
             sources = list(dict.fromkeys(s.strip() for s in raw_sources if s.strip()))
         else:
             sources = list(dict.fromkeys(s.strip() for s in raw_sources.splitlines() if s.strip()))
+
+        # Filter out sources that are currently excluded by health tracking
+        if source_health:
+            sources = source_health.filter_active(sources)
 
         for url in sources:
             self.metrics[url] = {"parsed": 0, "alive": 0}

@@ -68,8 +68,8 @@
         "`python -m py_compile main.py core/parser.py core/settings.py` — без ошибок"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Drone 0: 536 alive, Drone 3: 12 alive. Разница в 45x указывает на неравномерное распределение качественных источников. Нужен health-tracking источников."
+      "passes": true,
+      "notes": "✅ 2026-06-04: Shard distribution changed from chunk-based to round-robin (all_nodes[idx::count]) to evenly spread nodes from each source across drones. SourceHealth class added — persistent tracking of consecutive failures per source, auto-exclusion after >5 zero-alive runs for 24h. Source yield metrics (parsed/alive/yield_pct) exported in stats_*.json via source_yields field. merge.py aggregates and logs top/bottom sources by yield. Health state persists via data/source_health.json (gitignored with exception). Workflow updated to upload per-drone health files and merge them in the merge step."
     },
     {
       "id": "US-C04",

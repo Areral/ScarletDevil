@@ -9,7 +9,7 @@ import core.logger
 from core.logger import GHA
 
 from core.settings import CONFIG
-from core.parser import LinkParser
+from core.parser import LinkParser, SourceHealth
 from core.engine import Inspector
 from core.exporter import Exporter
 from core.validator import RKNValidator
@@ -29,8 +29,9 @@ async def main() -> None:
         GHA.endgroup()
 
         GHA.group("② PARSE — Fetching & Decoding Subscription Sources")
+        source_health = SourceHealth(shard_index=shard_index if shard_count > 1 else -1)
         parser = LinkParser()
-        all_nodes = await parser.fetch_and_parse()
+        all_nodes = await parser.fetch_and_parse(source_health=source_health)
 
         if not all_nodes:
             GHA.error("No valid nodes after parsing — aborting drone.")
@@ -39,11 +40,13 @@ async def main() -> None:
             return
 
         if shard_count > 1:
-            chunk = (len(all_nodes) + shard_count - 1) // shard_count
-            nodes = all_nodes[shard_index * chunk : (shard_index + 1) * chunk]
+            # Round-robin distribution: each drone gets every Nth node.
+            # This ensures nodes from all sources are spread evenly across drones,
+            # preventing high-yield source clusters from landing entirely on one shard.
+            nodes = all_nodes[shard_index::shard_count]
             logger.info(
                 f"  Shard {shard_index + 1}/{shard_count} — "
-                f"zone: {nodes[0].config.server if nodes else '—'} … "
+                f"round-robin slice — "
                 f"({len(nodes):,} / {len(all_nodes):,} nodes)"
             )
         else:
@@ -67,6 +70,20 @@ async def main() -> None:
             if node.source_url in parser.metrics:
                 m = parser.metrics[node.source_url]
                 m["alive"] = m.get("alive", 0) + 1
+
+        # Record source health & compute per-source yields
+        source_yields: dict = {}
+        for url, m in parser.metrics.items():
+            parsed = m.get("parsed", 0)
+            alive = m.get("alive", 0)
+            source_health.record(url, parsed, alive)
+            if parsed > 0:
+                source_yields[url] = {
+                    "parsed": parsed,
+                    "alive": alive,
+                    "yield_pct": round(alive / parsed * 100, 1),
+                }
+        source_health.save()
 
         dead_sources = [
             url for url, m in parser.metrics.items()
@@ -101,6 +118,7 @@ async def main() -> None:
             l4_retry_attempts=getattr(inspector, "l4_retry_attempts", 0),
             l4_retry_recovered=getattr(inspector, "l4_retry_recovered", 0),
             l7_stats=getattr(inspector, "l7_stats", {}),
+            source_yields=source_yields,
         )
         GHA.endgroup()
 

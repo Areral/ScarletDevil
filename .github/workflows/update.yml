@@ -71,6 +71,7 @@ jobs:
           path: |
             data/sub_*.txt
             data/stats_*.json
+            data/source_health_*.json
             data/*.log
           retention-days: 1
 
@@ -107,12 +108,37 @@ jobs:
           TG_TOPIC_ID: ${{ secrets.TG_TOPIC_ID }}
         run: python merge.py
 
+      - name: 🩻 Merge Source Health Files
+        run: |
+          python -c "
+          import json, glob, os
+          merged = {}
+          for path in glob.glob('shards_temp/shard-data-*/source_health_*.json'):
+              try:
+                  with open(path) as f:
+                      health = json.load(f)
+                  for url, entry in health.items():
+                      existing = merged.get(url, {})
+                      # Keep the entry with the most recent last_check
+                      if entry.get('last_check', 0) > existing.get('last_check', 0):
+                          merged[url] = entry
+                      elif url not in merged:
+                          merged[url] = entry
+              except Exception as exc:
+                  print(f'WARN: failed to read {path}: {exc}')
+          os.makedirs('data', exist_ok=True)
+          with open('data/source_health.json', 'w') as f:
+              json.dump(merged, f, indent=2)
+          print(f'SourceHealth: merged {len(merged)} entries from multiple drones')
+          "
+
       - name: ⭰ Sync & Deploy
         run: |
           git config --global user.name "Scarlet Devil Bot"
           git config --global user.email "bot@scarletdevil.net"
           git add index.html sub_all.txt sub_bs.txt sub_chs.txt sub_ru.txt \
-                  sub_vless.txt sub_vmess.txt sub_trojan.txt sub_ss.txt sub_hy2.txt
+                  sub_vless.txt sub_vmess.txt sub_trojan.txt sub_ss.txt sub_hy2.txt \
+                  data/source_health.json
           
           if git diff --staged --quiet; then
             exit 0

@@ -103,3 +103,51 @@ Started:  4 июн 2026 г. 23:08:39
   detection rate для медленных узлов, но увеличивает общее время проверки. При 50 L4 survivors
   и 50 per batch: ~1 batch → ~35s на батч (8s startup + http checks + speed checks).
 ---
+
+## 2026-06-04 - US-C03: Балансировка шардов и курирование источников
+
+### Что сделано
+
+1. **Изменено распределение узлов по шардам (main.py):**
+   - Было: chunk-based `all_nodes[idx*chunk : (idx+1)*chunk]` — drone 0 получал первые 25% узлов
+   - Стало: round-robin `all_nodes[idx::count]` — каждый дрон получает каждый N-й узел
+   - Это гарантирует что узлы из каждого источника равномерно распределены по всем дронам
+   - Устраняет проблему кластеризации хороших источников в одном шарде
+
+2. **Добавлен класс SourceHealth (core/parser.py):**
+   - Персистентное отслеживание здоровья источников
+   - Загрузка/сохранение `data/source_health.json`
+   - Счётчик последовательных провалов (consecutive_failures)
+   - Авто-исключение после >5 провалов на 24 часа
+   - Восстановление при появлении живых узлов
+   - Каждый дрон пишет свой шард-файл: `data/source_health_{idx}.json`
+   - Метод `filter_active()` для фильтрации источников перед fetching
+
+3. **Source yield в телеметрии:**
+   - `source_yields` добавлен в `stats_*.json` через `Exporter.save_files()`
+   - Для каждого источника: parsed, alive, yield_pct
+   - `merge.py` агрегирует yield со всех дронов и логирует top-5 / bottom-3
+
+4. **Персистентность между запусками:**
+   - `.gitignore`: добавлено исключение `!data/source_health.json`
+   - Workflow: каждый дрон загружает `data/source_health_*.json` как артефакт
+   - Merge step: скрипт объединяет health-файлы со всех дронов (по last_check)
+   - Объединённый `data/source_health.json` коммитится вместе с sub-файлами
+
+### Изменённые файлы
+
+- `main.py` — round-robin sharding, SourceHealth интеграция, source_yields в Exporter
+- `core/parser.py` — SourceHealth class (+140 lines), filter в fetch_and_parse
+- `core/exporter.py` — source_yields параметр в save_files и stats JSON
+- `merge.py` — агрегация и логирование source_yields (top/bottom источников)
+- `.github/workflows/update.yml` — загрузка health артефактов, merge шаг, git add health.json
+- `.gitignore` — исключение `!data/source_health.json`
+- `prd.json` — US-C03 passes: true
+
+### Learnings for future iterations:
+- **Chunk vs round-robin sharding:** Chunk-based sharding группирует узлы по порядку парсинга — если хорошие источники парсятся первыми, drone 0 получает все их узлы. Round-robin равномерно распределяет узлы независимо от порядка.
+- **Source health persistence:** Для exclusion на 24h нужна персистентность между CI-запусками. Подход с git-коммитом health-файла прост и надёжен, но требует аккуратного merge'а при параллельных дронах (используем `last_check` timestamp для разрешения конфликтов).
+- **upload-artifact@v4 flattening:** Без `**` в path, артефакты flatten'ятся — `data/source_health_0.json` становится просто `source_health_0.json` в корне артефакта. Важно учитывать это при написании merge-скриптов.
+- **Yield tracking:** Даже с round-robin шардингом, качество источников остаётся ключевым фактором. Source yield в телеметрии позволяет идентифицировать лучшие/худшие источники для ручного курирования.
+- **Источники не шардируются на уровне fetching:** Все дроны всё ещё запрашивают все источники. Это даёт redundancy (если один дрон упадёт, другие соберут те же данные), но увеличивает нагрузку на источники. В будущем можно добавить опциональный source-level sharding.
+---

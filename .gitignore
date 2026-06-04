@@ -1,5 +1,6 @@
 # Runtime data / IPC files (Python <-> Go JSON handoff)
 data/
+!data/source_health.json
 
 # Go core build artifacts
 go_core/angra_core

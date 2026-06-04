@@ -255,6 +255,39 @@ def main() -> None:
             )
         except Exception as exc:
             logger.warning(f"  Ошибка чтения {f_path}: {exc}")
+
+    # Aggregate source yields across all drones for monitoring
+    all_yields: dict = {}
+    for f_path in stat_files:
+        try:
+            with open(f_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for url, yd in data.get("source_yields", {}).items():
+                existing = all_yields.get(url, {"parsed": 0, "alive": 0})
+                existing["parsed"] += yd.get("parsed", 0)
+                existing["alive"] += yd.get("alive", 0)
+                all_yields[url] = existing
+        except Exception:
+            pass
+
+    if all_yields:
+        ranked = sorted(
+            all_yields.items(),
+            key=lambda kv: kv[1]["alive"] / max(kv[1]["parsed"], 1),
+            reverse=True,
+        )
+        top_n = min(5, len(ranked))
+        logger.info(f"  📊 Top-{top_n} sources by yield:")
+        for url, yd in ranked[:top_n]:
+            yp = yd["alive"] / max(yd["parsed"], 1) * 100
+            logger.info(f"     {yp:5.1f}%  alive={yd['alive']:>4}  parsed={yd['parsed']:>5}  {url[:80]}")
+        if len(ranked) > top_n:
+            bottom_n = min(3, len(ranked) - top_n)
+            logger.info(f"  🗑️ Bottom-{bottom_n} sources by yield:")
+            for url, yd in ranked[-bottom_n:]:
+                yp = yd["alive"] / max(yd["parsed"], 1) * 100
+                logger.info(f"     {yp:5.1f}%  alive={yd['alive']:>4}  parsed={yd['parsed']:>5}  {url[:80]}")
+
     GHA.endgroup()
 
     GHA.group("② MERGE — Deduplicating Subscription Files")
