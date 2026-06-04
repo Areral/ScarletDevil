@@ -48,6 +48,10 @@ var (
 	// L4 failure reason counters (reset per l4 phase)
 	l4Stats   L4Stats
 	l4StatsMu sync.Mutex
+
+	// L7 failure reason counters (reset per l7 phase)
+	l7Stats   L7Stats
+	l7StatsMu sync.Mutex
 )
 
 // L4Stats tracks L4 failure reasons for telemetry
@@ -63,6 +67,22 @@ type L4Stats struct {
 	// Retry metrics
 	RetryAttempts  int `json:"retry_attempts"`
 	RetryRecovered int `json:"retry_recovered"` // nodes saved by retry
+}
+
+// L7Stats tracks L7 (sing-box) failure reasons for telemetry
+type L7Stats struct {
+	Total            int `json:"total"`
+	Survived         int `json:"survived"`
+	HTTPTimeout      int `json:"http_timeout"`
+	HTTPTLSError     int `json:"http_tls_error"`
+	HTTPBadStatus    int `json:"http_bad_status"`
+	HTTPOtherError   int `json:"http_other_error"`
+	SpeedTimeout     int `json:"speed_timeout"`
+	SpeedTLSError    int `json:"speed_tls_error"`
+	SpeedTooSlow     int `json:"speed_too_slow"`
+	SpeedOtherError  int `json:"speed_other_error"`
+	SingboxCrash     int `json:"singbox_crash"`
+	ProtocolMismatch int `json:"protocol_mismatch"`
 }
 
 func init() {
@@ -122,30 +142,85 @@ func main() {
 	fmt.Printf("✔[ФИЛЬТРАЦИЯ L4]: Отбраковано %d, Выжило: %d (%.2f%% survival)\n",
 		len(nodes)-len(l4Nodes), len(l4Nodes), survivalPct)
 
-	// Write L4 stats if third arg provided
-	if len(os.Args) >= 4 && os.Args[3] != "" {
-		l4StatsMu.Lock()
-		stats := l4Stats
-		l4StatsMu.Unlock()
-		if statsBytes, err := json.Marshal(stats); err == nil {
-			_ = os.WriteFile(os.Args[3], statsBytes, 0644)
-		}
-	}
-
+	// If no L4 survivors, write output + stats and exit early
 	if len(l4Nodes) == 0 {
 		_ = os.WriteFile(os.Args[2], []byte("[]"), 0644)
+		writeCombinedStats()
 		return
 	}
 
 	l7Nodes := runL7Phase(l4Nodes)
-	fmt.Printf("✔ [ИНСПЕКЦИЯ L7]: Завершена. Выжило узлов: %d\n", len(l7Nodes))
+	l7Pct := 0.0
+	if len(l4Nodes) > 0 {
+		l7Pct = float64(len(l7Nodes)) / float64(len(l4Nodes)) * 100
+	}
+	fmt.Printf("✔ [ИНСПЕКЦИЯ L7]: Завершена. Выжило узлов: %d (%.2f%% of L4 survivors)\n",
+		len(l7Nodes), l7Pct)
 
 	if len(l7Nodes) > 0 {
 		runChampionPhase(l7Nodes)
 	}
 
+	// Write combined L4+L7 stats
+	writeCombinedStats()
+
 	outData, _ := json.Marshal(l7Nodes)
 	_ = os.WriteFile(os.Args[2], outData, 0644)
+}
+
+// writeCombinedStats writes both L4 and L7 stats to the stats file (3rd CLI arg).
+func writeCombinedStats() {
+	if len(os.Args) < 4 || os.Args[3] == "" {
+		return
+	}
+	l4StatsMu.Lock()
+	l4 := l4Stats
+	l4StatsMu.Unlock()
+	l7StatsMu.Lock()
+	l7 := l7Stats
+	l7StatsMu.Unlock()
+
+	combined := map[string]interface{}{
+		"total":             l4.Total,
+		"survived":          l4.Survived,
+		"dns_error":         l4.DNS_Error,
+		"timeout":           l4.Timeout,
+		"connection_refused": l4.ConnectionRefused,
+		"invalid_config":    l4.InvalidConfig,
+		"other":             l4.Other,
+		"retry_attempts":    l4.RetryAttempts,
+		"retry_recovered":   l4.RetryRecovered,
+		"l7": map[string]interface{}{
+			"total":             l7.Total,
+			"survived":          l7.Survived,
+			"http_timeout":      l7.HTTPTimeout,
+			"http_tls_error":    l7.HTTPTLSError,
+			"http_bad_status":   l7.HTTPBadStatus,
+			"http_other_error":  l7.HTTPOtherError,
+			"speed_timeout":     l7.SpeedTimeout,
+			"speed_tls_error":   l7.SpeedTLSError,
+			"speed_too_slow":    l7.SpeedTooSlow,
+			"speed_other_error": l7.SpeedOtherError,
+			"singbox_crash":     l7.SingboxCrash,
+			"protocol_mismatch": l7.ProtocolMismatch,
+		},
+	}
+	if statsBytes, err := json.Marshal(combined); err == nil {
+		_ = os.WriteFile(os.Args[3], statsBytes, 0644)
+	}
+
+	// Print L7 failure breakdown
+	l7Total := l7.Total
+	l7Surv := l7.Survived
+	l7Dropped := l7Total - l7Surv
+	fmt.Printf("  L7 failure breakdown: total=%d dropped=%d survived=%d | "+
+		"http_timeout=%d http_tls=%d http_bad_status=%d http_other=%d | "+
+		"speed_timeout=%d speed_tls=%d speed_slow=%d speed_other=%d | "+
+		"singbox_crash=%d protocol_mismatch=%d\n",
+		l7Total, l7Dropped, l7Surv,
+		l7.HTTPTimeout, l7.HTTPTLSError, l7.HTTPBadStatus, l7.HTTPOtherError,
+		l7.SpeedTimeout, l7.SpeedTLSError, l7.SpeedTooSlow, l7.SpeedOtherError,
+		l7.SingboxCrash, l7.ProtocolMismatch)
 }
 
 func runL4Phase(nodes []map[string]interface{}) []map[string]interface{} {
@@ -315,6 +390,11 @@ func checkL4(node map[string]interface{}) (bool, string) {
 }
 
 func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
+	// Initialize L7 stats
+	l7StatsMu.Lock()
+	l7Stats = L7Stats{Total: len(nodes)}
+	l7StatsMu.Unlock()
+
 	batchSize := globalSettings.BatchSize
 	totalBatches := (len(nodes) + batchSize - 1) / batchSize
 	finalNodes := make([]map[string]interface{}, 0, len(nodes)/3)
@@ -335,6 +415,12 @@ func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 				batchNum, totalBatches, len(survivors))
 		}
 	}
+
+	// Finalize L7 survived count
+	l7StatsMu.Lock()
+	l7Stats.Survived = len(finalNodes)
+	l7StatsMu.Unlock()
+
 	return finalNodes
 }
 
@@ -347,6 +433,10 @@ func processSingboxRecursive(
 		return nil
 	}
 	if depth > 3 {
+		// Recursive splitting exhausted — nodes could not be checked
+		l7StatsMu.Lock()
+		l7Stats.SingboxCrash += len(batch)
+		l7StatsMu.Unlock()
 		return nil
 	}
 
@@ -412,6 +502,10 @@ func processSingboxBatch(
 	}
 
 	if firstValidPort == -1 || len(portToNode) == 0 {
+		// All nodes in this batch have no valid outbound config
+		l7StatsMu.Lock()
+		l7Stats.ProtocolMismatch += len(batch)
+		l7StatsMu.Unlock()
 		return nil, false
 	}
 
@@ -463,7 +557,7 @@ func processSingboxBatch(
 	}()
 
 	portReady := false
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(8 * time.Second) // increased from 5s
 	for time.Now().Before(deadline) {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", firstValidPort), 300*time.Millisecond)
 		if err == nil {
@@ -475,6 +569,10 @@ func processSingboxBatch(
 	}
 
 	if !portReady {
+		// Sing-box failed to start — track all nodes in batch
+		l7StatsMu.Lock()
+		l7Stats.SingboxCrash += len(batch)
+		l7StatsMu.Unlock()
 		return nil, true
 	}
 	time.Sleep(200 * time.Millisecond)
@@ -490,11 +588,25 @@ func processSingboxBatch(
 		go func(p int, n map[string]interface{}) {
 			defer wgPing.Done()
 			defer func() { <-semPing }()
-			if lat, ok := testHTTPPing(p); ok {
+			if lat, ok, reason := testHTTPPing(p); ok {
 				n["latency"] = lat
 				mu.Lock()
 				pingPassed[p] = n
 				mu.Unlock()
+			} else {
+				// Track L7 HTTP ping failure reason
+				l7StatsMu.Lock()
+				switch reason {
+				case "timeout":
+					l7Stats.HTTPTimeout++
+				case "tls_error":
+					l7Stats.HTTPTLSError++
+				case "bad_status":
+					l7Stats.HTTPBadStatus++
+				default:
+					l7Stats.HTTPOtherError++
+				}
+				l7StatsMu.Unlock()
 			}
 		}(port, node)
 	}
@@ -515,11 +627,25 @@ func processSingboxBatch(
 			defer wgSpeed.Done()
 			defer func() { <-semSpeed }()
 			verifySSL := resolvePayloadSSL(n)
-			if speed, ok := testHTTPSpeed(p, verifySSL, isChampion); ok {
+			if speed, ok, reason := testHTTPSpeed(p, verifySSL, isChampion); ok {
 				n["speed"] = speed
 				mu.Lock()
 				alive = append(alive, n)
 				mu.Unlock()
+			} else {
+				// Track L7 speed test failure reason
+				l7StatsMu.Lock()
+				switch reason {
+				case "timeout":
+					l7Stats.SpeedTimeout++
+				case "tls_error":
+					l7Stats.SpeedTLSError++
+				case "too_slow":
+					l7Stats.SpeedTooSlow++
+				default:
+					l7Stats.SpeedOtherError++
+				}
+				l7StatsMu.Unlock()
 			}
 		}(port, node)
 	}
@@ -551,7 +677,10 @@ func getSocksClient(port int, timeout time.Duration, verifySSL bool) *http.Clien
 	return &http.Client{Transport: transport, Timeout: timeout}
 }
 
-func testHTTPPing(port int) (int, bool) {
+// testHTTPPing probes connectivity through the SOCKS proxy.
+// Returns (latency_ms, ok, failure_reason).
+// failure_reason is one of: "" (success), "timeout", "tls_error", "http_error".
+func testHTTPPing(port int) (int, bool, string) {
 	maxLatency := globalSettings.MaxLatency
 	if maxLatency <= 0 {
 		maxLatency = 5000
@@ -565,6 +694,7 @@ func testHTTPPing(port int) (int, bool) {
 		}
 	}
 
+	// Prefer generate_204 endpoints — they return clean 204 responses
 	var filtered []string
 	for _, u := range urls {
 		if strings.Contains(strings.ToLower(u), "generate_204") {
@@ -580,17 +710,22 @@ func testHTTPPing(port int) (int, bool) {
 		urls = urls[:2]
 	}
 
+	// HTTP timeout: maxLatency + 10s buffer = 15s total (increased from 6.5s)
 	client := getSocksClient(
 		port,
-		time.Duration(maxLatency+1500)*time.Millisecond,
+		time.Duration(maxLatency+10000)*time.Millisecond,
 		false,
 	)
+
+	// Track reason for the LAST error across all URL attempts
+	var lastReason string
 
 	for _, targetURL := range urls {
 		t0 := time.Now()
 
 		req, err := http.NewRequest("GET", targetURL, nil)
 		if err != nil {
+			lastReason = "http_error"
 			continue
 		}
 		req.Header.Set("User-Agent",
@@ -598,6 +733,15 @@ func testHTTPPing(port int) (int, bool) {
 
 		resp, err := client.Do(req)
 		if err != nil {
+			errStr := strings.ToLower(err.Error())
+			if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline") {
+				lastReason = "timeout"
+			} else if strings.Contains(errStr, "tls") || strings.Contains(errStr, "x509") ||
+				strings.Contains(errStr, "handshake") {
+				lastReason = "tls_error"
+			} else {
+				lastReason = "http_error"
+			}
 			continue
 		}
 
@@ -605,19 +749,27 @@ func testHTTPPing(port int) (int, bool) {
 		resp.Body.Close()
 
 		if resp.StatusCode != 204 {
+			lastReason = "bad_status"
 			continue
 		}
 
 		lat := int(time.Since(t0).Milliseconds())
 		if lat > maxLatency {
-			return 0, false
+			return 0, false, "timeout"
 		}
-		return lat, true
+		return lat, true, ""
 	}
-	return 0, false
+
+	if lastReason == "" {
+		lastReason = "http_error"
+	}
+	return 0, false, lastReason
 }
 
-func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
+// testHTTPSpeed measures download speed through the SOCKS proxy.
+// Returns (speed_mbps, ok, failure_reason).
+// failure_reason is one of: "" (success), "timeout", "tls_error", "too_slow", "http_error".
+func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool, string) {
 	minSpeed := globalSettings.MinSpeed
 	if minSpeed <= 0 {
 		minSpeed = 1.0
@@ -637,7 +789,7 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
 			targetURL = "https://speed.cloudflare.com/__down?bytes=10485760"
 		}
 	} else {
-		timeout = 8 * time.Second
+		timeout = 15 * time.Second // increased from 8s
 		targetSize = normalDownloadBytes
 		targetURL = globalSettings.SpeedtestUrl
 		if targetURL == "" || targetURL == "https://speed.cloudflare.com" {
@@ -648,7 +800,7 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
 	client := getSocksClient(port, timeout, verifySSL)
 	req, err := http.NewRequest("GET", targetURL, nil)
 	if err != nil {
-		return 0, false
+		return 0, false, "http_error"
 	}
 	req.Header.Set("User-Agent",
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
@@ -656,12 +808,19 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
 	tStart := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, false
+		errStr := strings.ToLower(err.Error())
+		if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline") {
+			return 0, false, "timeout"
+		} else if strings.Contains(errStr, "tls") || strings.Contains(errStr, "x509") ||
+			strings.Contains(errStr, "handshake") {
+			return 0, false, "tls_error"
+		}
+		return 0, false, "http_error"
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 429 || resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return 0, false
+		return 0, false, "http_error"
 	}
 
 	buf := make([]byte, readBufSize)
@@ -673,7 +832,7 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
 
 		elapsed := time.Since(tStart).Seconds()
 		if elapsed > 3.5 && total < 65536 {
-			return 0, false
+			return 0, false, "too_slow"
 		}
 
 		if total >= targetSize || readErr != nil {
@@ -682,7 +841,7 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
 	}
 
 	if total < 256*1024 {
-		return 0, false
+		return 0, false, "too_slow"
 	}
 
 	elapsed := time.Since(tStart).Seconds()
@@ -695,9 +854,9 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool) {
 		speed = 3000.0
 	}
 	if speed < minSpeed {
-		return 0, false
+		return 0, false, "too_slow"
 	}
-	return speed, true
+	return speed, true, ""
 }
 
 func resolvePayloadSSL(node map[string]interface{}) bool {

@@ -972,7 +972,6 @@ function init() {
     initMobileNav();
     initLocalTime();
     initAccessibility();
-    initFXControl();
     initTypewriter();
     initStarDust();
     initStats();
@@ -1613,44 +1612,6 @@ function initAccessibility() {
     observer.observe(appGrid, { childList: true, subtree: true });
 }
 
-// --- EFFECT INTENSITY CONTROL (Minimal / Normal / Extreme) ---
-function initFXControl() {
-    const toggle = document.getElementById('fx-toggle');
-    if (!toggle) return;
-
-    const levels = ['M', 'N', 'E'];
-    const classes = ['fx-minimal', '', 'fx-extreme'];
-    const titles = ['Minimal — базовые эффекты', 'Normal — стандартные эффекты', 'Extreme — максимальные эффекты'];
-    const labels = ['Min', 'Norm', 'Ext'];
-
-    // Restore saved intensity
-    let idx = 1; // default: Normal
-    try {
-        const saved = parseInt(localStorage.getItem('sd_fx_intensity'));
-        if (!isNaN(saved) && saved >= 0 && saved <= 2) idx = saved;
-    } catch(e) {}
-
-    function applyIntensity(i) {
-        // Remove all fx classes
-        document.body.classList.remove('fx-minimal', 'fx-extreme');
-        if (classes[i]) document.body.classList.add(classes[i]);
-        toggle.textContent = levels[i];
-        toggle.title = titles[i];
-        try { localStorage.setItem('sd_fx_intensity', i); } catch(e) {}
-
-        // Show/hide intensity label
-        const label = document.querySelector('.fx-label');
-        if (label) label.textContent = labels[i];
-    }
-
-    applyIntensity(idx);
-
-    toggle.addEventListener('click', () => {
-        idx = (idx + 1) % 3;
-        applyIntensity(idx);
-    });
-}
-
 // --- TYPEWRITER EFFECT FOR SYS-LOG ---
 function initTypewriter() {
     const log = document.querySelector('.sys-log');
@@ -1784,7 +1745,7 @@ function startStardust() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const time = Date.now() * 0.001;
-        const intensity = document.body.classList.contains('fx-extreme') ? 1.2 : 0.7;
+        const intensity = 0.7;
 
         stardustParticles.forEach(function(p) {
             p.x += p.vx;
@@ -1859,8 +1820,7 @@ function initStats() {
         ss:     attr('data-ss-count', 'ss'),
         hy2:    attr('data-hy2-count', 'hy2'),
         bs:     attr('data-bs-count', 'bs'),
-        chs:    attr('data-chs-count', 'chs'),
-        ru:     attr('data-ru-count', 'ru')
+        chs:    attr('data-chs-count', 'chs')
     };
 
     var maxCount = Math.max(counts.vless, counts.vmess, counts.trojan, counts.ss, counts.hy2, 1);
@@ -1879,7 +1839,7 @@ function initStats() {
     setBar('bar-hy2', counts.hy2);
 
     // Render class bars
-    var maxClass = Math.max(counts.bs, counts.chs, counts.ru, 1);
+    var maxClass = Math.max(counts.bs, counts.chs, 1);
     function setClassBar(id, val) {
         var bar = document.getElementById(id);
         var valEl = document.getElementById('val-' + id.split('-')[1]);
@@ -1888,7 +1848,6 @@ function initStats() {
     }
     setClassBar('bar-bs', counts.bs);
     setClassBar('bar-chs', counts.chs);
-    setClassBar('bar-ru', counts.ru);
 
     // Render country distribution
     var countryStats = (node && Array.isArray(node.countries)) ? node.countries : null;

@@ -119,7 +119,6 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
             "max_speed": int(top_speed),
             "bs":        int(stats.get("bs_count", 0)),
             "chs":       int(stats.get("chs_count", 0)),
-            "ru":        int(stats.get("ru_count", 0)),
             "vless":     int(stats.get("vless_count", 0)),
             "vmess":     int(stats.get("vmess_count", 0)),
             "trojan":    int(stats.get("trojan_count", 0)),
@@ -138,7 +137,6 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
                .replace("{{MAX_SPEED}}", str(int(top_speed)))
                .replace("{{BS_COUNT}}", str(stats.get("bs_count", 0)))
                .replace("{{CHS_COUNT}}", str(stats.get("chs_count", 0)))
-               .replace("{{RU_COUNT}}", str(stats.get("ru_count", 0)))
                .replace("{{VLESS_COUNT}}", str(stats.get("vless_count", 0)))
                .replace("{{VMESS_COUNT}}", str(stats.get("vmess_count", 0)))
                .replace("{{TROJAN_COUNT}}", str(stats.get("trojan_count", 0)))
@@ -274,11 +272,6 @@ def main() -> None:
         "shards_temp/shard-data-*/sub_chs_*.txt",
         "sub_chs.txt",
         "Scarlet Devil | Vampire Dash (ЧС)",
-    )
-    stats["ru_count"] = merge_subscription_files(
-        "shards_temp/shard-data-*/sub_ru_*.txt",
-        "sub_ru.txt",
-        "Scarlet Devil | Remilia (RU-verified)",
     )
     stats["vless_count"] = merge_subscription_files(
         "shards_temp/shard-data-*/sub_vless_*.txt",

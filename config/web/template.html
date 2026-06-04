@@ -60,20 +60,20 @@
             <span class="nav-label">Приватность</span>
             <div class="nav-dot"></div>
         </button>
-        <button class="nav-btn" data-target="contacts" aria-label="Перейти к секции Контакты">
-            <span class="nav-label">Контакты</span>
-            <div class="nav-dot"></div>
-        </button>
-        <button class="nav-btn" data-target="faq" aria-label="Перейти к секции FAQ">
-            <span class="nav-label">FAQ</span>
-            <div class="nav-dot"></div>
-        </button>
         <button class="nav-btn" data-target="stats" aria-label="Перейти к секции Статистика">
             <span class="nav-label">Статистика</span>
             <div class="nav-dot"></div>
         </button>
         <button class="nav-btn" data-target="protocols" aria-label="Перейти к секции Протоколы">
             <span class="nav-label">Протоколы</span>
+            <div class="nav-dot"></div>
+        </button>
+        <button class="nav-btn" data-target="faq" aria-label="Перейти к секции FAQ">
+            <span class="nav-label">FAQ</span>
+            <div class="nav-dot"></div>
+        </button>
+        <button class="nav-btn" data-target="contacts" aria-label="Перейти к секции Контакты">
+            <span class="nav-label">Контакты</span>
             <div class="nav-dot"></div>
         </button>
     </nav>
@@ -85,12 +85,6 @@
         <button id="btn-bats" class="fun-btn" title="Духи особняка" aria-label="Включить духов особняка"><i class="fa-solid fa-ghost"></i></button>
         <button id="btn-scanline" class="fun-btn" title="Скан-линии CRT" aria-label="Включить скан-линии"><i class="fa-solid fa-barcode"></i></button>
         <button id="btn-stardust" class="fun-btn" title="Звёздная пыль" aria-label="Включить звёздную пыль"><i class="fa-solid fa-sparkles"></i></button>
-    </div>
-
-    <!-- EFFECT INTENSITY CONTROL -->
-    <div class="fx-control reveal" id="fx-control">
-        <button class="fx-toggle" id="fx-toggle" title="Интенсивность эффектов" aria-label="Переключить интенсивность эффектов">N</button>
-        <span class="fx-label">FX</span>
     </div>
 
     <!-- HAMBURGER BUTTON (mobile only) -->
@@ -113,10 +107,10 @@
                 <button class="mobile-nav-link" data-target="guide" aria-label="Перейти к разделу Гайд">Гайд</button>
                 <button class="mobile-nav-link" data-target="theory_bs" aria-label="Перейти к разделу БС vs ЧС">БС vs ЧС</button>
                 <button class="mobile-nav-link" data-target="theory_isp" aria-label="Перейти к разделу Приватность">Приватность</button>
-                <button class="mobile-nav-link" data-target="contacts" aria-label="Перейти к разделу Контакты">Контакты</button>
-                <button class="mobile-nav-link" data-target="faq" aria-label="Перейти к разделу FAQ">FAQ</button>
                 <button class="mobile-nav-link" data-target="stats" aria-label="Перейти к разделу Статистика">Статистика</button>
                 <button class="mobile-nav-link" data-target="protocols" aria-label="Перейти к разделу Протоколы">Протоколы</button>
+                <button class="mobile-nav-link" data-target="faq" aria-label="Перейти к разделу FAQ">FAQ</button>
+                <button class="mobile-nav-link" data-target="contacts" aria-label="Перейти к разделу Контакты">Контакты</button>
             </div>
             <div class="mobile-nav-fun">
                 <span class="mobile-nav-fun-label">Эффекты</span>
@@ -328,15 +322,202 @@
             </div>
         </section>
 
-        <!-- CONTACTS -->
-        <section id="contacts" class="content-section reveal">
+        <!-- STATISTICS -->
+        <section id="stats" class="content-section reveal">
             <div class="glass-card">
-                <h2><i class="fa-brands fa-telegram" style="color: var(--cyber-blue);"></i> Сообщество и Контакты</h2>
-                <div class="text-block text-center py-4">
-                    <p>Присоединяйтесь к нашему Telegram-форуму для обсуждения работы ядра, получения помощи по настройке клиентов и общения с другими участниками сети.</p>
-                    <a href="https://t.me/ScDevNetwork" target="_blank" rel="noopener noreferrer" class="btn-primary" style="margin-top: 15px;">
-                        <i class="fa-solid fa-paper-plane"></i> Перейти в Telegram
-                    </a>
+                <h2><i class="fa-solid fa-chart-pie" style="color: var(--touhou-sakura);"></i> Статистика сети</h2>
+                <div class="text-block">
+                    <p>Актуальная статистика собранных и проверенных узлов. Данные обновляются каждые 4–6 часов вместе с подписками.</p>
+                </div>
+
+                <!-- Stats data from merge.py -->
+                <div id="stats-data"
+                     data-bs-count="{{BS_COUNT}}"
+                     data-chs-count="{{CHS_COUNT}}"
+                     data-vless-count="{{VLESS_COUNT}}"
+                     data-vmess-count="{{VMESS_COUNT}}"
+                     data-trojan-count="{{TROJAN_COUNT}}"
+                     data-ss-count="{{SS_COUNT}}"
+                     data-hy2-count="{{HY2_COUNT}}"
+                     data-max-speed="{{MAX_SPEED}}"
+                     data-total-nodes="{{PROXY_COUNT}}"
+                     data-country-stats='{{COUNTRY_STATS_JSON}}'
+                     data-node-stats='{{NODE_STATS_JSON}}'
+                     style="display:none;">
+                </div>
+
+                <div class="stats-grid">
+                    <!-- Protocol Distribution -->
+                    <div class="stats-card">
+                        <h3 class="stats-card-title"><i class="fa-solid fa-code-branch" style="color: var(--touhou-purple);"></i> Распределение по протоколам</h3>
+                        <div class="chart-bars" id="protocol-chart">
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">VLESS</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-vless" id="bar-vless"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-vless">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">VMess</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-vmess" id="bar-vmess"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-vmess">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Trojan</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-trojan" id="bar-trojan"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-trojan">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Shadowsocks</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-ss" id="bar-ss"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-ss">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Hysteria2</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-hy2" id="bar-hy2"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-hy2">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Class Distribution -->
+                    <div class="stats-card">
+                        <h3 class="stats-card-title"><i class="fa-solid fa-layer-group" style="color: var(--accent);"></i> Распределение по классам</h3>
+                        <div class="chart-bars" id="class-chart">
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Nightbird (БС)</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-bs" id="bar-bs"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-bs">0</span>
+                            </div>
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">Vampire Dash (ЧС)</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-chs" id="bar-chs"></div>
+                                </div>
+                                <span class="chart-bar-value" id="val-chs">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Country Distribution -->
+                    <div class="stats-card stats-wide">
+                        <h3 class="stats-card-title"><i class="fa-solid fa-globe" style="color: var(--cyber-blue);"></i> Топ-10 стран по количеству узлов</h3>
+                        <div class="chart-bars" id="country-chart">
+                            <div class="chart-bar-row">
+                                <span class="chart-bar-label">—</span>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill bar-country" style="width: 0%;"></div>
+                                </div>
+                                <span class="chart-bar-value">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Speed Summary -->
+                    <div class="stats-card">
+                        <h3 class="stats-card-title"><i class="fa-solid fa-gauge-high" style="color: var(--cyber-green);"></i> Сводка по скорости</h3>
+                        <div class="stats-summary" id="speed-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Макс. скорость</span>
+                                <span class="summary-value text-touhou" id="sum-max-speed">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Всего живых узлов</span>
+                                <span class="summary-value" id="sum-total">—</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">BS узлов (Reality)</span>
+                                <span class="summary-value" style="color: #c4b5fd;" id="sum-bs">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PROTOCOL COMPARISON -->
+        <section id="protocols" class="content-section reveal">
+            <div class="glass-card">
+                <h2><i class="fa-solid fa-scale-balanced" style="color: var(--accent);"></i> Сравнение протоколов</h2>
+                <div class="text-block">
+                    <p>Каждый протокол имеет свои сильные и слабые стороны. Выберите подходящий под вашу сеть и задачи.</p>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="cyber-table protocol-table">
+                        <thead>
+                            <tr>
+                                <th>Протокол</th>
+                                <th>Скорость</th>
+                                <th>Обфускация</th>
+                                <th>Стабильность</th>
+                                <th>Рекомендация</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-vless">VLESS Reality</span>
+                                    <span class="proto-sub">XTLS-Vision + REALITY</span>
+                                </td>
+                                <td><span class="rating rating-high">★★★★☆</span></td>
+                                <td><span class="rating rating-max">★★★★★</span><br><span class="rating-detail">Полная маскировка под реальный HTTPS-сайт</span></td>
+                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Высокая, особенно на выделенных серверах</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-best">Лучший для БС</span><br><span class="rec-detail">Идеален для жёстких блокировок. Единственный протокол для мобильных сетей с тотальной фильтрацией.</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-vmess">VMess</span>
+                                    <span class="proto-sub">WebSocket / gRPC / TCP</span>
+                                </td>
+                                <td><span class="rating rating-mid">★★★☆☆</span></td>
+                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">Базовая обфускация через WebSocket</span></td>
+                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Широкая поддержка клиентами</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-good">Универсальный</span><br><span class="rec-detail">Хорош для повседневного использования. Совместим практически со всеми клиентами.</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-trojan">Trojan</span>
+                                    <span class="proto-sub">TLS + WebSocket</span>
+                                </td>
+                                <td><span class="rating rating-high">★★★★☆</span></td>
+                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Миникрия под HTTPS, TLS-сертификат</span></td>
+                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Проверенный, зрелый протокол</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-good">Надёжный</span><br><span class="rec-detail">Стабильный выбор. Работает на большинстве сетей, простая настройка.</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-ss">Shadowsocks</span>
+                                    <span class="proto-sub">AEAD-шифры (2022)</span>
+                                </td>
+                                <td><span class="rating rating-max">★★★★★</span></td>
+                                <td><span class="rating rating-low">★★☆☆☆</span><br><span class="rating-detail">Без маскировки, легко детектируется</span></td>
+                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">Зависит от провайдера</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-niche">Нишевый</span><br><span class="rec-detail">Максимальная скорость для стриминга. Только для сетей без глубокой инспекции трафика.</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="proto-label proto-hy2">Hysteria2</span>
+                                    <span class="proto-sub">QUIC (UDP) + Brutal</span>
+                                </td>
+                                <td><span class="rating rating-max">★★★★★</span></td>
+                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">QUIC-трафик маскируется, но UDP заметен</span></td>
+                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">Чувствителен к потере пакетов</span></td>
+                                <td class="rec-cell"><span class="rec-badge rec-speed">Скорость</span><br><span class="rec-detail">Лучший для видео 4K и больших загрузок на стабильных сетях. Не для жёсткого DPI.</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -370,7 +551,7 @@
                                 <ol>
                                     <li><b>L4 TCP Connect</b> — попытка установить TCP-соединение с сервером. Отсеивает до 70% нерабочих узлов.</li>
                                     <li><b>L7 HTTP Request</b> — запрос через прокси-туннель с использованием <code>sing-box</code>. Проверяет, что узел действительно проксирует трафик, а не просто отвечает на TCP.</li>
-                                    <li><b>Speed Test</b> — загрузка 50MB чанка для измерения реальной пропускной способности канала.</li>
+                                    <li><b>Speed Test</b> — загрузка 10MB чанка для измерения реальной пропускной способности канала.</li>
                                 </ol>
                                 <p>Каждые несколько часов цикл повторяется, и подписки обновляются.</p>
                             </div>
@@ -539,210 +720,15 @@
             </div>
         </section>
 
-        <!-- STATISTICS -->
-        <section id="stats" class="content-section reveal">
+        <!-- CONTACTS -->
+        <section id="contacts" class="content-section reveal">
             <div class="glass-card">
-                <h2><i class="fa-solid fa-chart-pie" style="color: var(--touhou-sakura);"></i> Статистика сети</h2>
-                <div class="text-block">
-                    <p>Актуальная статистика собранных и проверенных узлов. Данные обновляются каждые 4–6 часов вместе с подписками.</p>
-                </div>
-
-                <!-- Stats data from merge.py -->
-                <div id="stats-data"
-                     data-bs-count="{{BS_COUNT}}"
-                     data-chs-count="{{CHS_COUNT}}"
-                     data-ru-count="{{RU_COUNT}}"
-                     data-vless-count="{{VLESS_COUNT}}"
-                     data-vmess-count="{{VMESS_COUNT}}"
-                     data-trojan-count="{{TROJAN_COUNT}}"
-                     data-ss-count="{{SS_COUNT}}"
-                     data-hy2-count="{{HY2_COUNT}}"
-                     data-max-speed="{{MAX_SPEED}}"
-                     data-total-nodes="{{PROXY_COUNT}}"
-                     data-country-stats='{{COUNTRY_STATS_JSON}}'
-                     data-node-stats='{{NODE_STATS_JSON}}'
-                     style="display:none;">
-                </div>
-
-                <div class="stats-grid">
-                    <!-- Protocol Distribution -->
-                    <div class="stats-card">
-                        <h3 class="stats-card-title"><i class="fa-solid fa-code-branch" style="color: var(--touhou-purple);"></i> Распределение по протоколам</h3>
-                        <div class="chart-bars" id="protocol-chart">
-                            <div class="chart-bar-row">
-                                <span class="chart-bar-label">VLESS</span>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill bar-vless" id="bar-vless"></div>
-                                </div>
-                                <span class="chart-bar-value" id="val-vless">0</span>
-                            </div>
-                            <div class="chart-bar-row">
-                                <span class="chart-bar-label">VMess</span>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill bar-vmess" id="bar-vmess"></div>
-                                </div>
-                                <span class="chart-bar-value" id="val-vmess">0</span>
-                            </div>
-                            <div class="chart-bar-row">
-                                <span class="chart-bar-label">Trojan</span>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill bar-trojan" id="bar-trojan"></div>
-                                </div>
-                                <span class="chart-bar-value" id="val-trojan">0</span>
-                            </div>
-                            <div class="chart-bar-row">
-                                <span class="chart-bar-label">Shadowsocks</span>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill bar-ss" id="bar-ss"></div>
-                                </div>
-                                <span class="chart-bar-value" id="val-ss">0</span>
-                            </div>
-                            <div class="chart-bar-row">
-                                <span class="chart-bar-label">Hysteria2</span>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill bar-hy2" id="bar-hy2"></div>
-                                </div>
-                                <span class="chart-bar-value" id="val-hy2">0</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Class Distribution -->
-                    <div class="stats-card">
-                        <h3 class="stats-card-title"><i class="fa-solid fa-layer-group" style="color: var(--accent);"></i> Распределение по классам</h3>
-                        <div class="chart-bars" id="class-chart">
-                            <div class="chart-bar-row">
-                                <span class="chart-bar-label">Nightbird (БС)</span>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill bar-bs" id="bar-bs"></div>
-                                </div>
-                                <span class="chart-bar-value" id="val-bs">0</span>
-                            </div>
-                            <div class="chart-bar-row">
-                                <span class="chart-bar-label">Vampire Dash (ЧС)</span>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill bar-chs" id="bar-chs"></div>
-                                </div>
-                                <span class="chart-bar-value" id="val-chs">0</span>
-                            </div>
-                            <div class="chart-bar-row">
-                                <span class="chart-bar-label">Remilia (RU)</span>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill bar-ru" id="bar-ru"></div>
-                                </div>
-                                <span class="chart-bar-value" id="val-ru">0</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Country Distribution -->
-                    <div class="stats-card stats-wide">
-                        <h3 class="stats-card-title"><i class="fa-solid fa-globe" style="color: var(--cyber-blue);"></i> Топ-10 стран по количеству узлов</h3>
-                        <div class="chart-bars" id="country-chart">
-                            <div class="chart-bar-row">
-                                <span class="chart-bar-label">—</span>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill bar-country" style="width: 0%;"></div>
-                                </div>
-                                <span class="chart-bar-value">—</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Speed Summary -->
-                    <div class="stats-card">
-                        <h3 class="stats-card-title"><i class="fa-solid fa-gauge-high" style="color: var(--cyber-green);"></i> Сводка по скорости</h3>
-                        <div class="stats-summary" id="speed-summary">
-                            <div class="summary-item">
-                                <span class="summary-label">Макс. скорость</span>
-                                <span class="summary-value text-touhou" id="sum-max-speed">—</span>
-                            </div>
-                            <div class="summary-item">
-                                <span class="summary-label">Всего живых узлов</span>
-                                <span class="summary-value" id="sum-total">—</span>
-                            </div>
-                            <div class="summary-item">
-                                <span class="summary-label">BS узлов (Reality)</span>
-                                <span class="summary-value" style="color: #c4b5fd;" id="sum-bs">—</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- PROTOCOL COMPARISON -->
-        <section id="protocols" class="content-section reveal">
-            <div class="glass-card">
-                <h2><i class="fa-solid fa-scale-balanced" style="color: var(--accent);"></i> Сравнение протоколов</h2>
-                <div class="text-block">
-                    <p>Каждый протокол имеет свои сильные и слабые стороны. Выберите подходящий под вашу сеть и задачи.</p>
-                </div>
-
-                <div class="table-responsive">
-                    <table class="cyber-table protocol-table">
-                        <thead>
-                            <tr>
-                                <th>Протокол</th>
-                                <th>Скорость</th>
-                                <th>Обфускация</th>
-                                <th>Стабильность</th>
-                                <th>Рекомендация</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>
-                                    <span class="proto-label proto-vless">VLESS Reality</span>
-                                    <span class="proto-sub">XTLS-Vision + REALITY</span>
-                                </td>
-                                <td><span class="rating rating-high">★★★★☆</span></td>
-                                <td><span class="rating rating-max">★★★★★</span><br><span class="rating-detail">Полная маскировка под реальный HTTPS-сайт</span></td>
-                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Высокая, особенно на выделенных серверах</span></td>
-                                <td class="rec-cell"><span class="rec-badge rec-best">Лучший для БС</span><br><span class="rec-detail">Идеален для жёстких блокировок. Единственный протокол для мобильных сетей с тотальной фильтрацией.</span></td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <span class="proto-label proto-vmess">VMess</span>
-                                    <span class="proto-sub">WebSocket / gRPC / TCP</span>
-                                </td>
-                                <td><span class="rating rating-mid">★★★☆☆</span></td>
-                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">Базовая обфускация через WebSocket</span></td>
-                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Широкая поддержка клиентами</span></td>
-                                <td class="rec-cell"><span class="rec-badge rec-good">Универсальный</span><br><span class="rec-detail">Хорош для повседневного использования. Совместим практически со всеми клиентами.</span></td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <span class="proto-label proto-trojan">Trojan</span>
-                                    <span class="proto-sub">TLS + WebSocket</span>
-                                </td>
-                                <td><span class="rating rating-high">★★★★☆</span></td>
-                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Миникрия под HTTPS, TLS-сертификат</span></td>
-                                <td><span class="rating rating-high">★★★★☆</span><br><span class="rating-detail">Проверенный, зрелый протокол</span></td>
-                                <td class="rec-cell"><span class="rec-badge rec-good">Надёжный</span><br><span class="rec-detail">Стабильный выбор. Работает на большинстве сетей, простая настройка.</span></td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <span class="proto-label proto-ss">Shadowsocks</span>
-                                    <span class="proto-sub">AEAD-шифры (2022)</span>
-                                </td>
-                                <td><span class="rating rating-max">★★★★★</span></td>
-                                <td><span class="rating rating-low">★★☆☆☆</span><br><span class="rating-detail">Без маскировки, легко детектируется</span></td>
-                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">Зависит от провайдера</span></td>
-                                <td class="rec-cell"><span class="rec-badge rec-niche">Нишевый</span><br><span class="rec-detail">Максимальная скорость для стриминга. Только для сетей без глубокой инспекции трафика.</span></td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <span class="proto-label proto-hy2">Hysteria2</span>
-                                    <span class="proto-sub">QUIC (UDP) + Brutal</span>
-                                </td>
-                                <td><span class="rating rating-max">★★★★★</span></td>
-                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">QUIC-трафик маскируется, но UDP заметен</span></td>
-                                <td><span class="rating rating-mid">★★★☆☆</span><br><span class="rating-detail">Чувствителен к потере пакетов</span></td>
-                                <td class="rec-cell"><span class="rec-badge rec-speed">Скорость</span><br><span class="rec-detail">Лучший для видео 4K и больших загрузок на стабильных сетях. Не для жёсткого DPI.</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <h2><i class="fa-brands fa-telegram" style="color: var(--cyber-blue);"></i> Сообщество и Контакты</h2>
+                <div class="text-block text-center py-4">
+                    <p>Присоединяйтесь к нашему Telegram-форуму для обсуждения работы ядра, получения помощи по настройке клиентов и общения с другими участниками сети.</p>
+                    <a href="https://t.me/ScDevNetwork" target="_blank" rel="noopener noreferrer" class="btn-primary" style="margin-top: 15px;">
+                        <i class="fa-solid fa-paper-plane"></i> Перейти в Telegram
+                    </a>
                 </div>
             </div>
         </section>
@@ -958,23 +944,6 @@
                             </div>
                         </div>
 
-                        <!-- Remilia (RU-verified) -->
-                        <div class="sub-card ru-verified">
-                            <div class="sub-header">
-                                <div class="sub-title"><i class="fa-solid fa-crown" style="color: #fbbf24;"></i> RU-Проверенные</div>
-                                <div class="sub-badge badge-ru">Remilia</div>
-                            </div>
-                            <div class="sub-desc">Узлы, проверенные из РФ. Гарантированно обходят ТСПУ и работают на российских провайдерах.</div>
-                            <div class="sub-tech">ПРОВЕРЕНО ИЗ РФ</div>
-                            <div class="sub-actions">
-                                <button class="sub-action-btn copy-btn" onclick="event.stopPropagation(); copySub('/sub/ru', 'Remilia (RU)')">
-                                    <i class="fa-solid fa-copy"></i> Копировать URL
-                                </button>
-                                <button class="sub-action-btn qr-btn" onclick="event.stopPropagation(); showQR('/sub/ru', 'Remilia — RU-Проверенные')">
-                                    <i class="fa-solid fa-qrcode"></i> QR
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </div>
 

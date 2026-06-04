@@ -100,6 +100,7 @@ async def main() -> None:
             l4_failure_reasons=getattr(inspector, "l4_failure_reasons", {}),
             l4_retry_attempts=getattr(inspector, "l4_retry_attempts", 0),
             l4_retry_recovered=getattr(inspector, "l4_retry_recovered", 0),
+            l7_stats=getattr(inspector, "l7_stats", {}),
         )
         GHA.endgroup()
 

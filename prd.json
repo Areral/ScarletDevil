@@ -52,8 +52,8 @@
         "`cd go_core && go build -o /dev/null ./... && go vet ./...` — без ошибок"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Анализ: L7 батчи по 100 узлов, большинство дают 0 survivors. Нужно понять причину — неправильный тестовый URL, слишком короткий таймаут, или узлы действительно не проксируют трафик."
+      "passes": true,
+      "notes": "✅ 2026-06-04: L7 HTTP ping timeout increased from 6.5s to 15s (maxLatency + 10s buffer). L7 speed test timeout increased from 8s to 15s. Sing-box startup deadline increased from 5s to 8s. Batch size reduced from 100 to 50. L7 failure reason tracking added: http_timeout, http_tls_error, http_bad_status, http_other_error, speed_timeout, speed_tls_error, speed_too_slow, speed_other_error, singbox_crash, protocol_mismatch. Stats written via combined L4+L7 IPC stats file. Python Inspector extracts L7 stats and logs breakdown."
     },
     {
       "id": "US-C03",

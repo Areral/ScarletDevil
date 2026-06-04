@@ -157,6 +157,48 @@ class Inspector:
         self.l4_failure_reasons: Dict[str, int] = {}
         self.l4_retry_attempts = 0
         self.l4_retry_recovered = 0
+        self.l7_stats: Dict[str, int] = {}
+        self.l7_total = 0
+        self.l7_survived = 0
+
+    def _extract_l4_stats(self, stats: dict) -> None:
+        """Extract L4 failure reasons from combined stats, excluding meta and L7 keys."""
+        l4_meta = {"total", "survived", "retry_attempts", "retry_recovered", "l7"}
+        self.l4_failure_reasons = {
+            k: v for k, v in stats.items()
+            if k not in l4_meta and not isinstance(v, dict)
+        }
+        self.l4_retry_attempts = stats.get("retry_attempts", 0)
+        self.l4_retry_recovered = stats.get("retry_recovered", 0)
+        logger.info(
+            f"  L4 failure breakdown: {self.l4_failure_reasons} | "
+            f"retries={self.l4_retry_attempts} recovered={self.l4_retry_recovered}"
+        )
+
+    def _extract_l7_stats(self, stats: dict) -> None:
+        """Extract L7 failure reasons from combined stats and log breakdown."""
+        l7 = stats.get("l7", {})
+        if not l7 or not isinstance(l7, dict):
+            return
+        self.l7_stats = l7
+        self.l7_total = l7.get("total", 0)
+        self.l7_survived = l7.get("survived", 0)
+        l7_dropped = self.l7_total - self.l7_survived
+        l7_pct = (self.l7_survived / self.l7_total * 100) if self.l7_total > 0 else 0.0
+        logger.info(
+            f"  L7 failure breakdown: total={self.l7_total} dropped={l7_dropped} "
+            f"survived={self.l7_survived} ({l7_pct:.1f}%) | "
+            f"http_timeout={l7.get('http_timeout', 0)} "
+            f"http_tls_error={l7.get('http_tls_error', 0)} "
+            f"http_bad_status={l7.get('http_bad_status', 0)} "
+            f"http_other={l7.get('http_other_error', 0)} | "
+            f"speed_timeout={l7.get('speed_timeout', 0)} "
+            f"speed_tls={l7.get('speed_tls_error', 0)} "
+            f"speed_slow={l7.get('speed_too_slow', 0)} "
+            f"speed_other={l7.get('speed_other_error', 0)} | "
+            f"singbox_crash={l7.get('singbox_crash', 0)} "
+            f"protocol_mismatch={l7.get('protocol_mismatch', 0)}"
+        )
 
     async def _resolve_geo(self, nodes: List[ProxyNode]) -> None:
         logger.info("  GeoIP: разрешение DNS...")
@@ -337,40 +379,24 @@ class Inspector:
             if proc.returncode != 0:
                 stderr_text = b"".join(stderr_chunks).decode(errors="replace")
                 logger.error(f"  ANGRA-CORE exited {proc.returncode}: {stderr_text[:500]}")
-                # Try to read L4 stats even on failure
+                # Try to read L4/L7 stats even on failure
                 if os.path.exists(stats_file):
                     try:
                         with open(stats_file, "r", encoding="utf-8") as sf:
-                            l4s = json.load(sf)
-                        self.l4_failure_reasons = {
-                            k: v for k, v in l4s.items()
-                            if k not in ("total", "survived", "retry_attempts", "retry_recovered")
-                        }
-                        self.l4_retry_attempts = l4s.get("retry_attempts", 0)
-                        self.l4_retry_recovered = l4s.get("retry_recovered", 0)
-                        logger.info(
-                            f"  L4 failure breakdown: {self.l4_failure_reasons} | "
-                            f"retries={self.l4_retry_attempts} recovered={self.l4_retry_recovered}"
-                        )
+                            stats = json.load(sf)
+                        self._extract_l4_stats(stats)
+                        self._extract_l7_stats(stats)
                     except Exception:
                         pass
                 return []
 
-            # Read L4 failure stats
+            # Read L4/L7 failure stats
             if os.path.exists(stats_file):
                 try:
                     with open(stats_file, "r", encoding="utf-8") as sf:
-                        l4s = json.load(sf)
-                    self.l4_failure_reasons = {
-                        k: v for k, v in l4s.items()
-                        if k not in ("total", "survived", "retry_attempts", "retry_recovered")
-                    }
-                    self.l4_retry_attempts = l4s.get("retry_attempts", 0)
-                    self.l4_retry_recovered = l4s.get("retry_recovered", 0)
-                    logger.info(
-                        f"  L4 failure breakdown: {self.l4_failure_reasons} | "
-                        f"retries={self.l4_retry_attempts} recovered={self.l4_retry_recovered}"
-                    )
+                        stats = json.load(sf)
+                    self._extract_l4_stats(stats)
+                    self._extract_l7_stats(stats)
                 except Exception:
                     pass
 

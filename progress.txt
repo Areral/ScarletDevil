@@ -41,3 +41,65 @@ Started:  4 июн 2026 г. 23:08:39
 - **timeout vs connection_refused:** При timeout есть смысл ретраить (сеть может быть перегружена), при connection_refused — нет (сервер активно отвергает).
 - **go vet:** Предупреждает о формате адреса для IPv6 даже если код корректно обрабатывает оба случая. Лучше использовать if/else вместо перезаписи переменной.
 - **pydantic v1/v2:** Локально установлен pydantic 1.10.12, но код требует 2.6.1. Python import падает, но compile — OK. CI должен иметь правильную версию.
+
+## 2026-06-04 - US-C02: Аудит и настройка параметров L7 sing-box валидации
+
+### Что сделано
+
+1. **Добавлен детальный L7 failure reason tracking в Go:**
+   - Новая структура `L7Stats` с полями: HTTPTimeout, HTTPTLSError, HTTPBadStatus, HTTPOtherError,
+     SpeedTimeout, SpeedTLSError, SpeedTooSlow, SpeedOtherError, SingboxCrash, ProtocolMismatch
+   - `testHTTPPing` возвращает категорию ошибки: timeout / tls_error / bad_status / http_error
+   - `testHTTPSpeed` возвращает категорию ошибки: timeout / tls_error / too_slow / http_error
+   - Трекинг отказов в `processSingboxBatch`: HTTP ping failures, speed test failures,
+     singbox startup crash, no-valid-outbound (protocol_mismatch)
+   - Трекинг в `processSingboxRecursive`: recursive depth exhausted → singbox_crash
+   - `runL7Phase` инициализирует L7 stats (Total) и финализирует Survived
+
+2. **Увеличены таймауты L7:**
+   - HTTP ping buffer: 1.5s → 10s (total ~15s с maxLatency=5000ms)
+   - Speed test non-champion: 8s → 15s
+   - Sing-box startup deadline: 5s → 8s
+
+3. **Уменьшен размер батча:**
+   - BATCH_SIZE: 100 → 50 (в config/settings.yaml)
+   - Комментарий: меньше батчей → точнее контроль, но больше sing-box рестартов
+
+4. **Комбинированные L4+L7 stats в IPC:**
+   - Новая функция `writeCombinedStats()` — пишет L4 (верхний уровень) + L7 (вложенный объект "l7")
+   - Формат: `{"total": N, "dns_error": N, ..., "l7": {"total": N, "http_timeout": N, ...}}`
+   - Печать L7 failure breakdown при завершении
+
+5. **Python получает и логирует L7 stats:**
+   - `Inspector._extract_l4_stats()` / `Inspector._extract_l7_stats()` — новые хелперы
+   - `Inspector.l7_stats` dict + `l7_total` / `l7_survived` поля
+   - L7 breakdown логируется в loguru
+   - `Exporter.write()` принимает `l7_stats` параметр и пишет в `stats_*.json`
+   - `main.py` передаёт `l7_stats` из Inspector в Exporter
+
+### Изменённые файлы
+
+- go_core/main.go — L7Stats struct, модификации testHTTPPing/testHTTPSpeed, processSingboxBatch,
+  processSingboxRecursive, runL7Phase, main, writeCombinedStats
+- core/engine.py — Inspector: l7_stats поля, _extract_l4_stats(), _extract_l7_stats()
+- core/exporter.py — write() принимает l7_stats, пишет в stats JSON
+- main.py — передача l7_stats в Exporter
+- config/settings.yaml — BATCH_SIZE: 50
+- prd.json — US-C02 passes: true
+
+### Learnings for future iterations:
+- **L7 sing-box architecture:** Каждый батч запускает отдельный sing-box процесс с SOCKS-инбаундами.
+  Один крашнувшийся outbound может обрушить весь батч → recursive splitting пополам до изоляции проблемного узла.
+- **HTTP ping vs speed test:** Два независимых этапа в каждом батче. Ping проверяет connectivity (204 response),
+  speed test замеряет пропускную способность (512KB download). Узел должен пройти ОБА этапа.
+- **L7 failure categories:** HTTP ping failure происходит через SOCKS-прокси → ошибки могут быть
+  timeout (прокси не отвечает), tls_error (TLS handshake failed), bad_status (не 204), http_error (всё остальное).
+  Speed test failure добавляет too_slow (недостаточно скорости).
+- **Singbox crash ≠ node failure:** Краш sing-box может быть вызван багом sing-box или несовместимой
+  конфигурацией, а не проблемой самого узла. Recursive splitting помогает изолировать проблемный узел.
+- **Stats channel evolution:** Переход от плоского L4-only stats к вложенному L4+L7 формату.
+  Вложенный объект "l7" добавлен без ломки существующего L4 парсинга.
+- **Timeout tuning tradeoffs:** Увеличение таймаутов (15s HTTP, 15s speed, 8s startup) улучшает
+  detection rate для медленных узлов, но увеличивает общее время проверки. При 50 L4 survivors
+  и 50 per batch: ~1 batch → ~35s на батч (8s startup + http checks + speed checks).
+---
