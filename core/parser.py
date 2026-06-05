@@ -176,7 +176,7 @@ class SourceHealth:
 class LinkParser:
     GARBAGE_WORDS = [
         "01010101", "9292929", "11111111-1111", "test1",
-        "@pwn1337-telegram", "rootface",
+        "pwn1337", "rootface",
     ]
 
     HOST_RE = re.compile(r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
@@ -384,6 +384,11 @@ class LinkParser:
         try:
             raw_json = LinkParser.decode_base64(line.replace("vmess://", "").strip())
             data = json.loads(raw_json)
+
+            # Garbage-word filter also applies to the decoded node name (ps),
+            # which is invisible in the base64 line checked above.
+            if LinkParser._is_garbage(str(data.get('ps', ''))):
+                return None
 
             host = str(data.get('add', '')).strip()
             if not host or not LinkParser.is_valid_host(host):
