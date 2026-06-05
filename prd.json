@@ -1,6 +1,6 @@
 {
   "project": "Scarlet Devil Network — Checker Remediation & Site Polish",
-  "branchName": "ralph/checker-remediation",
+  "branchName": "main",
   "dependsOn": "ralph/website-overhaul (all US-W01..US-W10 complete)",
   "description": "Фаза 2: улучшение качества проверки узлов (анализ логов показал 0.94% survival rate при дисбалансе дронов до 45x), исправление UI-багов, удаление RU-узлов, реорганизация секций сайта. Стек: Python (merge.py, core/engine.py, core/parser.py, core/validator.py) + Go (go_core/main.go) + статический HTML/CSS/JS (config/web/*) + Vercel (vercel.json) + GitHub Actions (.github/workflows/update.yml).",
   "analysisSummary": {
