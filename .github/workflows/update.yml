@@ -8,7 +8,9 @@ on:
 
 concurrency:
   group: deploy
-  cancel-in-progress: true
+  # Let an in-flight run finish instead of killing a mid-validation drone.
+  # Overlapping runs queue rather than cancel (drones can take ~40+ min).
+  cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -17,6 +19,7 @@ jobs:
   matrix-crawler:
     name: 🦇 Drone Matrix [${{ matrix.shard }}]
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -62,6 +65,11 @@ jobs:
           SUBSCRIPTION_SOURCES: ${{ secrets.SUBSCRIPTION_SOURCES }}
           SHARD_INDEX: ${{ matrix.shard }}
           SHARD_COUNT: 4
+          # RU_VERDICT_FILE (optional): path to a JSON list of node strict_ids that an
+          # external RU probe worker confirmed reachable from inside Russia. When set, the
+          # matching nodes are flagged ru_verified and emitted to sub_ru.txt. When unset,
+          # sub_ru.txt is simply empty. To enable, add a step before this one that fetches
+          # the worker's verdict (artifact/release/curl) and export RU_VERDICT_FILE here.
         run: python main.py
 
       - name: 📦 Upload Artifacts
@@ -138,12 +146,15 @@ jobs:
           git config --global user.email "bot@scarletdevil.net"
           git add index.html sub_all.txt sub_bs.txt sub_chs.txt sub_ru.txt \
                   sub_vless.txt sub_vmess.txt sub_trojan.txt sub_ss.txt sub_hy2.txt \
-                  data/source_health.json
-          
+                  data/source_health.json data/pool.json
+
           if git diff --staged --quiet; then
+            echo "No changes to publish."
             exit 0
           fi
-          
-          git commit --amend -m "⏣ Scarlet Matrix Sync: $(date -u)" || git commit -m "⏣ Scarlet Matrix Sync: $(date -u)"
-          git push --force
-          
+
+          git commit -m "⏣ Scarlet Matrix Sync: $(date -u)"
+          # Publish to main with a normal push (no --amend, no --force).
+          # Rebase first in case a concurrent run advanced main.
+          git pull --rebase origin main || true
+          git push origin main

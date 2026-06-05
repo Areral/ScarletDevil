@@ -258,11 +258,12 @@ class Exporter:
         if not nodes:
             nodes_bs: List[ProxyNode] = []
             nodes_chs: List[ProxyNode] = []
+            nodes_ru: List[ProxyNode] = []
         else:
             nodes_bs = [n for n in nodes if n.is_bs]
             nodes_chs = [n for n in nodes if not n.is_bs]
+            nodes_ru = [n for n in nodes if n.ru_verified]
 
-        nodes_ru = [n for n in nodes if n.ru_verified]
         nodes_vless = [n for n in nodes if n.protocol == "vless"]
         nodes_vmess = [n for n in nodes if n.protocol == "vmess"]
         nodes_trojan = [n for n in nodes if n.protocol == "trojan"]

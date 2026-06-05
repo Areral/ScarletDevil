@@ -3,6 +3,7 @@ import asyncio
 import time
 import sys
 import os
+import json
 from loguru import logger
 
 import core.logger
@@ -13,6 +14,46 @@ from core.parser import LinkParser, SourceHealth
 from core.engine import Inspector
 from core.exporter import Exporter
 from core.validator import RKNValidator
+from core.models import ProxyNode
+
+
+def apply_ru_verdict(nodes: list) -> int:
+    """Flag nodes as ru_verified from an external RU probe worker's verdict.
+
+    The verdict is env-gated via RU_VERDICT_FILE: a JSON file holding the list of
+    node strict_ids that an RU-side worker confirmed reachable from inside Russia.
+    Accepts a bare JSON list of ids, or an object with a "verified"/"ids" key.
+    When the env var is unset or the file is missing, nothing is flagged and
+    sub_ru.txt is simply empty (no failure).
+    """
+    verdict_file = os.environ.get("RU_VERDICT_FILE", "")
+    if not verdict_file:
+        return 0
+    if not os.path.exists(verdict_file):
+        logger.warning(
+            f"  RU verdict: {verdict_file} not found — sub_ru will be empty"
+        )
+        return 0
+    try:
+        with open(verdict_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            data = data.get("verified", data.get("ids", []))
+        verified = {str(x) for x in data}
+    except Exception as exc:
+        logger.warning(f"  RU verdict: failed to load {verdict_file}: {exc}")
+        return 0
+
+    flagged = 0
+    for n in nodes:
+        if n.strict_id in verified:
+            n.ru_verified = True
+            flagged += 1
+    logger.info(
+        f"  RU verdict: flagged {flagged}/{len(nodes)} nodes as ru_verified "
+        f"({len(verified)} ids in verdict)"
+    )
+    return flagged
 
 
 async def main() -> None:
@@ -30,8 +71,44 @@ async def main() -> None:
 
         GHA.group("② PARSE — Fetching & Decoding Subscription Sources")
         source_health = SourceHealth(shard_index=shard_index if shard_count > 1 else -1)
-        parser = LinkParser()
-        all_nodes = await parser.fetch_and_parse(source_health=source_health)
+        nodes_file = os.environ.get("NODES_FILE", "")
+        if nodes_file:
+            # Parse-once mode (US-004): nodes pre-parsed by an upstream job.
+            with open(nodes_file, "r", encoding="utf-8") as f:
+                raw_list = json.load(f)
+            all_nodes = [ProxyNode.model_validate(d) for d in raw_list]
+            logger.info(f"Loaded {len(all_nodes)} nodes from {nodes_file}")
+            parser = None
+            source_metrics: dict = {}
+        else:
+            parser = LinkParser()
+            all_nodes = await parser.fetch_and_parse(source_health=source_health)
+            source_metrics = parser.metrics
+
+        # --- Rolling pool: add historically-working nodes to the check set ---
+        pool_path = "data/pool.json"
+        pool_added = 0
+        fresh_ids = {n.strict_id for n in all_nodes}
+        if os.path.exists(pool_path):
+            try:
+                with open(pool_path, "r", encoding="utf-8") as f:
+                    pool_entries = json.load(f)
+                for entry in pool_entries:
+                    uri = entry.get("uri", "")
+                    if not uri:
+                        continue
+                    node = LinkParser.parse_link(uri)
+                    if node and node.strict_id not in fresh_ids:
+                        node.is_bs = RKNValidator.check_bs(node)
+                        all_nodes.append(node)
+                        fresh_ids.add(node.strict_id)
+                        pool_added += 1
+                if pool_added:
+                    logger.info(
+                        f"  Pool: added {pool_added} historically-working nodes to check set"
+                    )
+            except Exception as exc:
+                logger.warning(f"  Pool: failed to load {pool_path}: {exc}")
 
         if not all_nodes:
             GHA.error("No valid nodes after parsing — aborting drone.")
@@ -68,13 +145,13 @@ async def main() -> None:
         GHA.phase("④", "AGGREGATE", "Metrics & deduplication")
 
         for node in alive_nodes:
-            if node.source_url in parser.metrics:
-                m = parser.metrics[node.source_url]
+            if node.source_url in source_metrics:
+                m = source_metrics[node.source_url]
                 m["alive"] = m.get("alive", 0) + 1
 
         # Record source health & compute per-source yields
         source_yields: dict = {}
-        for url, m in parser.metrics.items():
+        for url, m in source_metrics.items():
             parsed = m.get("parsed", 0)
             alive = m.get("alive", 0)
             source_health.record(url, parsed, alive)
@@ -87,7 +164,7 @@ async def main() -> None:
         source_health.save()
 
         dead_sources = [
-            url for url, m in parser.metrics.items()
+            url for url, m in source_metrics.items()
             if m.get("parsed", 0) > 0 and m.get("alive", 0) == 0
         ]
 
@@ -96,6 +173,8 @@ async def main() -> None:
         for n in alive_nodes:
             unique_alive[n.strict_id] = n
         alive_nodes = list(unique_alive.values())
+
+        apply_ru_verdict(alive_nodes)
 
         bs_count = sum(1 for n in alive_nodes if n.is_bs)
         top_speed = max((n.speed for n in alive_nodes), default=0.0)

@@ -137,6 +137,152 @@
       "priority": 7,
       "passes": true,
       "notes": "✅ 2026-06-05: send_telegram_report() расширен. Добавлены: overall survival rate (unique_alive/parsed) с ⚠️-алертом при <0.5%; лучший/худший дрон по survival (drone_survival агрегируется из per-drone alive/parsed); топ-3 страны (из country_stats); топ-3 источника по yield (top_sources из ranked yields); разбивка причин отказов (failure_reasons агрегирует l4_failure_reasons + l7_stats, исключая total/survived). HTML-разметка Telegram (b/code/эмодзи). py_compile OK."
+    },
+    {
+      "id": "US-001",
+      "title": "Speed as ranking signal, not a hard filter",
+      "description": "As a user in Russia, I want more working proxies in the output, so transient bandwidth contention on the CI runner does not drop otherwise-alive nodes.",
+      "acceptanceCriteria": [
+        "In go_core/main.go a node that passes the L7 connectivity ping (HTTP 204) survives even when measured speed is below min_speed",
+        "Speed is still measured and stored on the node (used only for sorting/labels, not for dropping)",
+        "min_speed becomes an opt-in ranking threshold via a settings flag (e.g. speed_as_filter, default false) instead of an unconditional cut in testHTTPSpeed",
+        "Speed-test concurrency (semSpeed) is reduced or made configurable to lower channel contention",
+        "`cd go_core && go build -o /dev/null ./...` succeeds and `go vet ./...` is clean",
+        "Rationale appended to progress.txt"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "AUDIT.md §2.4 — biggest immediate win on working-proxy count."
+    },
+    {
+      "id": "US-002",
+      "title": "Remove dead code and extract shared UUID util",
+      "description": "As a maintainer, I want no duplicated/dead code so the codebase is easier to reason about.",
+      "acceptanceCriteria": [
+        "Remove the unused Inspector.champion_run method in core/engine.py (champion phase lives in Go)",
+        "Create core/util.py exposing is_valid_uuid(val) -> bool",
+        "core/parser.py and core/engine.py import is_valid_uuid from core.util instead of redefining it",
+        "`python -m py_compile main.py merge.py core/*.py` passes",
+        "`python -c \"import core.parser, core.engine, core.util\"` runs without error"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "AUDIT.md §2.5"
+    },
+    {
+      "id": "US-003",
+      "title": "Add .gitignore for build/runtime artifacts",
+      "description": "As a maintainer, I want generated artifacts excluded from git so they cannot be committed by accident.",
+      "acceptanceCriteria": [
+        "Root .gitignore ignores: data/, go_core/angra_core, go_core/angra_core.exe, *.log, __pycache__/, *.pyc, .last-branch, archive/",
+        "`git status --porcelain` shows none of those paths as untracked after a dry run that creates them",
+        "Already-tracked source files remain tracked (no source accidentally ignored)"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "AUDIT.md §2.12"
+    },
+    {
+      "id": "US-004",
+      "title": "Parse once: NODES_FILE input mode + round-robin sharding",
+      "description": "As an operator, I want parsing to run once instead of 4x (once per drone), so CI does less redundant work and sharding is balanced.",
+      "acceptanceCriteria": [
+        "Add parse_only.py that runs RKNValidator.load_lists() + LinkParser.fetch_and_parse() and writes data/nodes.json (list of model_dump(by_alias=True) dicts)",
+        "main.py reads NODES_FILE env var: when set, it loads nodes from that JSON and skips fetch_and_parse()",
+        "Sharding uses round-robin (all_nodes[shard_index::shard_count]) instead of contiguous slicing",
+        "When NODES_FILE is unset, behavior is unchanged (backwards compatible)",
+        "`python -m py_compile parse_only.py main.py` passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "AUDIT.md §2.1, §2.2"
+    },
+    {
+      "id": "US-005",
+      "title": "GeoIP efficiency: dedup hosts and /24 country cache",
+      "description": "As an operator, I want GeoIP resolution to avoid duplicate work and reduce ip-api rate-limit risk.",
+      "acceptanceCriteria": [
+        "core/engine.py _resolve_geo deduplicates hosts before DNS resolution (resolve each unique host once)",
+        "Country cache is keyed by IPv4 /24 network (fallback to exact IP for IPv6)",
+        "Number of ip-api lookups for a fixed node set is provably reduced (logged before/after counts)",
+        "`python -c \"import core.engine\"` runs without error"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "AUDIT.md §2.3"
+    },
+    {
+      "id": "US-006",
+      "title": "Rolling pool of historically-working nodes",
+      "description": "As a user, I want the working-proxy list to stay populated even when upstream sources are temporarily down or pruned.",
+      "acceptanceCriteria": [
+        "merge.py persists surviving nodes to data/pool.json with fields: uri, last_seen (ISO), fail_count",
+        "Node set at run start is the union of freshly parsed nodes and pooled nodes (pooled nodes get re-checked)",
+        "A pooled node is evicted after 3 consecutive runs where it failed checks; fail_count resets to 0 on success",
+        "pool.json is created on first run if absent and never grows unbounded (evicted nodes removed)",
+        "`python -m py_compile merge.py` passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "AUDIT.md §4.1 — biggest win on stability/count over time."
+    },
+    {
+      "id": "US-007",
+      "title": "Publish output to a dedicated branch (no force-push on main)",
+      "description": "As a maintainer, I want published subscriptions to stop rewriting main history with amend+force.",
+      "acceptanceCriteria": [
+        ".github/workflows/update.yml publishes sub_all.txt, sub_bs.txt, sub_chs.txt and index.html to a dedicated branch (e.g. gh-pages) using a normal commit",
+        "No `git commit --amend` and no `git push --force` against main",
+        "vercel.json / deployment notes updated to serve subscriptions from the publish branch",
+        "Workflow YAML is valid (parses with `python -c \"import yaml,sys; yaml.safe_load(open('.github/workflows/update.yml'))\"`)"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "AUDIT.md §2.6"
+    },
+    {
+      "id": "US-008",
+      "title": "Parser tests and linters in CI",
+      "description": "As a maintainer, I want regression protection on the most fragile component (the link parser) and automated lint.",
+      "acceptanceCriteria": [
+        "Add tests/test_parser.py with table-driven cases covering vless/vmess/ss/trojan/hy2 — valid links produce expected ProxyConfig fields, garbage links return None",
+        "Add requirements-dev.txt with pytest (and ruff)",
+        "`pytest -q` passes locally",
+        "A CI workflow (e.g. .github/workflows/ci.yml) runs ruff, pytest, and `cd go_core && go vet ./...` on push/PR",
+        "All new code passes `python -m py_compile`"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "AUDIT.md §3.1, §3.2"
+    },
+    {
+      "id": "US-009",
+      "title": "Cache whitelist lists and log list age",
+      "description": "As an operator, I want BS/whitelist classification to survive a temporary outage of the upstream whitelist sources.",
+      "acceptanceCriteria": [
+        "RKNValidator caches the last successfully fetched whitelist to data/whitelist_cache/ (domains + cidr)",
+        "When a fetch fails or returns empty, the cached copy is loaded instead of leaving lists empty",
+        "load_lists logs the source counts and a warning when falling back to cache or when lists are empty",
+        "`python -c \"import core.validator\"` runs without error"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "AUDIT.md §5.1.3 — keeps the Nightbird (BS) class from collapsing to zero."
+    },
+    {
+      "id": "US-010",
+      "title": "RU-verified subscription scaffolding",
+      "description": "As a user in Russia, I want a subscription verified from inside RU; this story adds the plumbing so an RU probe can publish a separate list without an external VPS being required for the code to be correct.",
+      "acceptanceCriteria": [
+        "Exporter can emit an additional sub_ru.txt built from nodes flagged ru_verified=True on the ProxyNode model",
+        "A documented, env-gated ingestion path (e.g. RU_VERDICT_FILE) lets an external RU worker submit a list of node ids that passed from RU; absent the file, sub_ru.txt is simply empty (no failure)",
+        "vercel.json exposes /sub/ru -> sub_ru.txt",
+        "README/AUDIT updated with how to run an RU probe worker",
+        "`python -m py_compile core/exporter.py core/models.py` passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "AUDIT.md §5.1 — the single biggest lever for real-world RU effectiveness. Code-only scaffolding here; the actual RU worker is operational, not part of this repo's CI."
     }
   ],
   "implementationOrder": [
@@ -166,5 +312,9 @@
     "noExternalDeps": "Никаких npm/CDN кроме Font Awesome и Google Fonts. QR — самописный JS.",
     "naming": "CSS: kebab-case, JS: camelCase, Python: snake_case, Go: camelCase",
     "comments": "Русский для пользовательских текстов, английский для технических комментариев в коде"
-  }
+  },
+  "mergedFrom": [
+    "checker-remediation",
+    "audit-remediation"
+  ]
 }

@@ -257,6 +257,71 @@ def _extract_country_stats(sub_file: str, top_n: int = 10) -> list:
     return [{"code": code, "count": cnt, "flag": ""} for code, cnt in sorted_countries]
 
 
+POOL_PATH = "data/pool.json"
+
+
+def load_pool(path: str = POOL_PATH) -> list:
+    """Load the rolling pool of historically-working nodes."""
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            pool = json.load(f)
+        return pool if isinstance(pool, list) else []
+    except Exception:
+        return []
+
+
+def save_pool(pool: list, path: str = POOL_PATH) -> None:
+    """Persist the rolling pool to disk."""
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(pool, f, indent=2, ensure_ascii=False)
+
+
+def update_pool(alive_uris: set, path: str = POOL_PATH) -> dict:
+    """Update the rolling pool based on this run's surviving nodes.
+
+    - Pool nodes that survived: fail_count reset to 0, last_seen updated.
+    - Pool nodes that didn't survive: fail_count incremented.
+    - New survivors: added to pool with fail_count=0.
+    - Nodes with fail_count >= 3: evicted.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    existing = load_pool(path)
+
+    pool_by_uri = {entry["uri"]: entry for entry in existing}
+
+    updated = []
+    evicted = 0
+    added = 0
+
+    for uri, entry in pool_by_uri.items():
+        if uri in alive_uris:
+            entry["fail_count"] = 0
+            entry["last_seen"] = now
+            updated.append(entry)
+            alive_uris.discard(uri)
+        else:
+            entry["fail_count"] = entry.get("fail_count", 0) + 1
+            if entry["fail_count"] < 3:
+                updated.append(entry)
+            else:
+                evicted += 1
+
+    for uri in alive_uris:
+        updated.append({"uri": uri, "last_seen": now, "fail_count": 0})
+        added += 1
+
+    save_pool(updated, path)
+
+    logger.info(
+        f"  Pool updated: {len(updated)} entries "
+        f"(evicted={evicted}, new={added})"
+    )
+    return {"size": len(updated), "evicted": evicted, "added": added}
+
+
 def main() -> None:
     GHA.nexus_header()
 
@@ -431,6 +496,11 @@ def main() -> None:
         "sub_hy2.txt",
         "Scarlet Devil | Hysteria2",
     )
+    merge_subscription_files(
+        "shards_temp/shard-data-*/sub_ru_*.txt",
+        "sub_ru.txt",
+        "Scarlet Devil | Remilia (RU-verified)",
+    )
 
     # Build country distribution: prefer drone GeoIP data, fall back to URL parsing
     if not stats["country_stats"]:
@@ -439,11 +509,23 @@ def main() -> None:
         GHA.row("🌍 GeoIP", f"{len(stats['country_stats'])} countries", status="ok")
     GHA.endgroup()
 
-    GHA.phase("③", "BUILD", "Compiling dashboard (index.html)")
+    GHA.phase("③", "POOL", "Updating rolling pool of historically-working nodes")
+    alive_uris: set = set()
+    for sub_file in ["sub_all.txt", "sub_bs.txt", "sub_chs.txt"]:
+        if os.path.exists(sub_file):
+            with open(sub_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        alive_uris.add(line)
+    update_pool(alive_uris)
+    GHA.endgroup()
+
+    GHA.phase("④", "BUILD", "Compiling dashboard (index.html)")
     build_html(stats["unique_alive"], stats["top_speed"], stats)
     GHA.endgroup()
 
-    GHA.phase("④", "NOTIFY", "Sending Telegram report")
+    GHA.phase("⑤", "NOTIFY", "Sending Telegram report")
     asyncio.run(send_telegram_report(stats))
     GHA.endgroup()
 

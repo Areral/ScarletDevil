@@ -12,18 +12,27 @@ from typing import List, Optional, Dict
 from core.models import ProxyNode
 from core.settings import CONFIG
 from core.logger import GHA
+from core.util import is_valid_uuid
 
 
 class BatchEngine:
     _GEO_CACHE: Dict[str, str] = {}
 
     @staticmethod
-    def _is_valid_uuid(val: str) -> bool:
+    def _geo_cache_key(ip: str) -> str:
+        """Return /24 network for IPv4, exact IP for IPv6.
+
+        Neighboring IPv4 addresses within a /24 almost always share the same
+        country, so we key by subnet to avoid redundant ip-api lookups.
+        """
         try:
-            uuid.UUID(str(val))
-            return True
+            addr = ipaddress.ip_address(ip)
+            if addr.version == 4:
+                net = ipaddress.IPv4Network(f"{addr}/24", strict=False)
+                return str(net)
+            return ip  # IPv6: exact match
         except ValueError:
-            return False
+            return ip
 
     @staticmethod
     def _node_to_outbound(node: ProxyNode, tag: str) -> Optional[dict]:
@@ -32,14 +41,14 @@ class BatchEngine:
 
         try:
             if node.protocol == "vless":
-                if not c.uuid or not BatchEngine._is_valid_uuid(c.uuid):
+                if not c.uuid or not is_valid_uuid(c.uuid):
                     return None
                 base.update({"type": "vless", "uuid": c.uuid})
                 if c.flow:
                     base["flow"] = c.flow
 
             elif node.protocol == "vmess":
-                if not c.uuid or not BatchEngine._is_valid_uuid(c.uuid):
+                if not c.uuid or not is_valid_uuid(c.uuid):
                     return None
                 base.update({
                     "type": "vmess",
@@ -216,27 +225,53 @@ class Inspector:
                 except Exception:
                     return None
 
-        hosts = [n.config.server.strip("[]") for n in nodes]
-        resolved: List[Optional[str]] = await asyncio.gather(
-            *[resolve_ip(h) for h in hosts]
+        # Deduplicate hosts — many nodes share the same server hostname.
+        host_to_nodes: Dict[str, List[ProxyNode]] = {}
+        for node in nodes:
+            host = node.config.server.strip("[]")
+            host_to_nodes.setdefault(host, []).append(node)
+
+        unique_hosts = list(host_to_nodes.keys())
+        resolved_ips = await asyncio.gather(
+            *[resolve_ip(h) for h in unique_hosts]
+        )
+        host_to_ip: Dict[str, Optional[str]] = dict(
+            zip(unique_hosts, resolved_ips)
         )
 
+        # Map resolved IPs back to nodes.
         node_ip_pairs: List[tuple] = []
-        ips_to_fetch: List[str] = []
-        seen: set = set()
-
-        for node, ip in zip(nodes, resolved):
+        for node in nodes:
+            host = node.config.server.strip("[]")
+            ip = host_to_ip.get(host)
             if not ip:
                 node.country = "UN"
                 continue
             node_ip_pairs.append((node, ip))
-            if ip not in BatchEngine._GEO_CACHE and ip not in seen:
+
+        # Count cache hits before fetching.
+        cache_hits = 0
+        already_cached: set = set()
+        for _, ip in node_ip_pairs:
+            ck = BatchEngine._geo_cache_key(ip)
+            if ck in BatchEngine._GEO_CACHE or ck in already_cached:
+                cache_hits += 1
+            else:
+                already_cached.add(ck)
+
+        # Build deduplicated fetch list keyed by /24 (IPv4) or exact IP (IPv6).
+        ips_to_fetch: List[str] = []
+        seen: set = set()
+        for _, ip in node_ip_pairs:
+            ck = BatchEngine._geo_cache_key(ip)
+            if ck not in BatchEngine._GEO_CACHE and ck not in seen:
                 ips_to_fetch.append(ip)
-                seen.add(ip)
+                seen.add(ck)
 
         GHA.row(
             "GeoIP",
-            f"resolved {len(node_ip_pairs)} nodes · fetching {len(ips_to_fetch)} IPs",
+            f"{len(nodes)} nodes · {len(unique_hosts)} hosts · "
+            f"{cache_hits} cached · fetching {len(ips_to_fetch)}",
         )
 
         GEO_BATCH = 100
@@ -264,9 +299,11 @@ class Inspector:
                                     ok = item.get("status", "fail") == "success"
                                     raw_cc = item.get("countryCode") if ok else None
                                     cc = (raw_cc or "UN").strip().upper()
-                                    BatchEngine._GEO_CACHE[ip_key] = (
-                                        cc if len(cc) == 2 else "UN"
-                                    )
+                                    cc = cc if len(cc) == 2 else "UN"
+                                    # Store under /24 key for IPv4 so neighbours reuse.
+                                    BatchEngine._GEO_CACHE[
+                                        BatchEngine._geo_cache_key(ip_key)
+                                    ] = cc
                             elif resp.status == 429:
                                 logger.warning("  GeoIP: rate limit — remaining nodes → UN")
                                 break
@@ -276,8 +313,11 @@ class Inspector:
                     if i + GEO_BATCH < len(ips_to_fetch):
                         await asyncio.sleep(GEO_SLEEP)
 
+        # Assign countries from cache (keyed by /24 or exact IP).
         for node, ip in node_ip_pairs:
-            node.country = BatchEngine._GEO_CACHE.get(ip, "UN")
+            node.country = BatchEngine._GEO_CACHE.get(
+                BatchEngine._geo_cache_key(ip), "UN"
+            )
 
         assigned = sum(1 for n in nodes if n.country != "UN")
         GHA.row("GeoIP", f"flags assigned {assigned}/{len(nodes)}", last=True, status="ok")
@@ -310,6 +350,8 @@ class Inspector:
             "settings": {
                 "max_latency": CONFIG.checking.get("max_latency", 5000),
                 "min_speed":   CONFIG.checking.get("min_speed", 1.0),
+                "speed_as_filter": CONFIG.checking.get("speed_as_filter", False),
+                "speed_concurrency": CONFIG.checking.get("speed_concurrency", 12),
                 "connectivity_urls": CONFIG.checking.get(
                     "connectivity_urls", ["http://cp.cloudflare.com/generate_204"]
                 ),
@@ -433,6 +475,3 @@ class Inspector:
             await self._resolve_geo(valid_nodes)
 
         return valid_nodes
-
-    async def champion_run(self, nodes: List[ProxyNode]) -> float:
-        return max((n.speed for n in nodes), default=0.0)
