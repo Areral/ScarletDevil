@@ -1,6 +1,7 @@
 # --- START OF FILE core/logger.py ---
 import sys
 import os
+import unicodedata
 from loguru import logger
 
 os.makedirs("data", exist_ok=True)
@@ -92,17 +93,32 @@ class GHA:
         print(f"::error::{msg}", flush=True)
 
     # ── Banners ─────────────────────────────────────────────────────────────
+    @staticmethod
+    def _disp_width(text: str) -> int:
+        """Visible column width — emoji & East-Asian-wide glyphs take 2 cells."""
+        width = 0
+        for ch in text:
+            if ord(ch) >= 0x1F000 or unicodedata.east_asian_width(ch) in ("W", "F"):
+                width += 2
+            else:
+                width += 1
+        return width
+
     @classmethod
     def _banner(cls, glyph: str, title: str, color: str) -> None:
-        line = "═" * 58
+        text = f"{glyph}  {title}"
+        inner = 60  # interior width between the two ║ borders
+        pad = inner - 2 - cls._disp_width(text)  # 2 = leading spaces inside box
+        rule = "═" * inner
         print(flush=True)
-        print(cls._c(color, f"  ╓{line}"), flush=True)
+        print(cls._c(color, f"  ╔{rule}╗"), flush=True)
         print(
             cls._c(color, "  ║  ")
-            + cls._c(color + C.BOLD, f"{glyph}  {title}"),
+            + cls._c(color + C.BOLD, text)
+            + cls._c(color, f"{' ' * max(pad, 1)}║"),
             flush=True,
         )
-        print(cls._c(color, f"  ╙{line}"), flush=True)
+        print(cls._c(color, f"  ╚{rule}╝"), flush=True)
         print(flush=True)
 
     @staticmethod
