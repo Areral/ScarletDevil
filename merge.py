@@ -124,7 +124,7 @@ async def send_telegram_report(stats: dict) -> None:
                 url, json=payload, timeout=aiohttp.ClientTimeout(total=15)
             ) as resp:
                 resp.raise_for_status()
-                logger.info("  Telegram report доставлен ✔")
+                GHA.row("Telegram", "report delivered ✔", last=True, status="ok")
         except Exception as exc:
             logger.error(f"  Ошибка отправки в Telegram: {exc}")
 
@@ -196,7 +196,7 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
         with open("index.html", "w", encoding="utf-8") as f:
             f.write(html_out)
 
-        logger.info(f"  index.html сгенерирован ({total_alive:,} узлов, {int(top_speed)} Mbps)")
+        GHA.row("index.html", f"{total_alive:,} nodes · {int(top_speed)} Mbps", last=True, status="ok")
     except Exception as exc:
         logger.error(f"  Ошибка генерации HTML: {exc}")
 
@@ -224,7 +224,7 @@ def merge_subscription_files(pattern: str, output_file: str, title: str) -> int:
         for link in unique_map.values():
             f.write(f"{link}\n")
 
-    logger.info(f"  {output_file:<20} ← {len(files):>2} shards  →  {len(unique_map):>6,} unique nodes")
+    GHA.row(f"{output_file}", f"{len(files)} shards → {len(unique_map):,} unique")
     return len(unique_map)
 
 
@@ -277,9 +277,9 @@ def main() -> None:
         "top_sources":  [],
     }
 
-    GHA.group("① COLLECT — Reading Drone Telemetry")
+    GHA.phase("①", "COLLECT", "Reading drone telemetry")
     stat_files = glob.glob("shards_temp/shard-data-*/stats_*.json")
-    logger.info(f"  Найдено файлов статистики: {len(stat_files)}")
+    GHA.row("stat files", f"{len(stat_files)} found")
 
     if not stat_files:
         GHA.warning("No stat files found — merge will produce empty subscriptions.")
@@ -376,21 +376,21 @@ def main() -> None:
             reverse=True,
         )
         top_n = min(5, len(ranked))
-        logger.info(f"  📊 Top-{top_n} sources by yield:")
+        GHA.row(f"top-{top_n} yield", "by source", status="ok")
         for url, yd in ranked[:top_n]:
             yp = yd["alive"] / max(yd["parsed"], 1) * 100
             stats["top_sources"].append({"url": url, "alive": yd["alive"], "yield_pct": round(yp, 1)})
-            logger.info(f"     {yp:5.1f}%  alive={yd['alive']:>4}  parsed={yd['parsed']:>5}  {url[:80]}")
+            GHA.note(f"  {yp:5.1f}%  alive={yd['alive']:>4}  parsed={yd['parsed']:>5}  {url[:80]}")
         if len(ranked) > top_n:
             bottom_n = min(3, len(ranked) - top_n)
-            logger.info(f"  🗑️ Bottom-{bottom_n} sources by yield:")
+            GHA.row(f"bottom-{bottom_n} yield", "by source", status="warn")
             for url, yd in ranked[-bottom_n:]:
                 yp = yd["alive"] / max(yd["parsed"], 1) * 100
-                logger.info(f"     {yp:5.1f}%  alive={yd['alive']:>4}  parsed={yd['parsed']:>5}  {url[:80]}")
+                GHA.note(f"  {yp:5.1f}%  alive={yd['alive']:>4}  parsed={yd['parsed']:>5}  {url[:80]}")
 
     GHA.endgroup()
 
-    GHA.group("② MERGE — Deduplicating Subscription Files")
+    GHA.phase("②", "MERGE", "Deduplicating subscription files")
     stats["unique_alive"] = merge_subscription_files(
         "shards_temp/shard-data-*/sub_all_*.txt",
         "sub_all.txt",
@@ -436,14 +436,14 @@ def main() -> None:
     if not stats["country_stats"]:
         stats["country_stats"] = _extract_country_stats("sub_all.txt")
     else:
-        logger.info(f"  🌍 Country stats from GeoIP: {len(stats['country_stats'])} countries")
+        GHA.row("🌍 GeoIP", f"{len(stats['country_stats'])} countries", status="ok")
     GHA.endgroup()
 
-    GHA.group("③ BUILD — Compiling Dashboard (index.html)")
+    GHA.phase("③", "BUILD", "Compiling dashboard (index.html)")
     build_html(stats["unique_alive"], stats["top_speed"], stats)
     GHA.endgroup()
 
-    GHA.group("④ NOTIFY — Sending Telegram Report")
+    GHA.phase("④", "NOTIFY", "Sending Telegram report")
     asyncio.run(send_telegram_report(stats))
     GHA.endgroup()
 

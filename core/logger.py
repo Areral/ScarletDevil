@@ -24,9 +24,39 @@ logger.add(
 )
 
 
-class GHA:
-    _W = 64
+# ─────────────────────────────────────────────────────────────────────────────
+#  Scarlet palette — raw ANSI. GitHub Actions renders these; NO_COLOR disables.
+# ─────────────────────────────────────────────────────────────────────────────
+class C:
+    _ON = (
+        sys.stdout.isatty() or os.environ.get("GITHUB_ACTIONS") == "true"
+    ) and os.environ.get("NO_COLOR") is None
 
+    RESET = "\033[0m" if _ON else ""
+    BOLD = "\033[1m" if _ON else ""
+    DIM = "\033[2m" if _ON else ""
+
+    SCARLET = "\033[38;5;197m" if _ON else ""   # hero red — headers
+    ROSE = "\033[38;5;211m" if _ON else ""      # soft pink — section titles
+    OK = "\033[38;5;78m" if _ON else ""         # green — success
+    WARN = "\033[38;5;221m" if _ON else ""      # amber — warnings
+    BAD = "\033[38;5;203m" if _ON else ""       # red — failures
+    CYAN = "\033[38;5;80m" if _ON else ""       # numbers / accents
+    GREY = "\033[38;5;245m" if _ON else ""      # labels / tree glyphs
+
+    @classmethod
+    def wrap(cls, color: str, text: str) -> str:
+        return f"{color}{text}{cls.RESET}" if color else text
+
+
+class GHA:
+    # Tree glyphs
+    _BAR = "┃"
+    _TEE = "├─"
+    _END = "└─"
+    _PIPE = "│"
+
+    # ── GitHub Actions log folding ──────────────────────────────────────────
     @staticmethod
     def group(title: str) -> None:
         print(f"::group::{title}", flush=True)
@@ -34,6 +64,12 @@ class GHA:
     @staticmethod
     def endgroup() -> None:
         print("::endgroup::", flush=True)
+
+    @classmethod
+    def phase(cls, marker: str, title: str, desc: str = "") -> None:
+        """Open a GitHub Actions fold AND render the tree trunk header."""
+        cls.group(f"{marker} {title}" + (f" — {desc}" if desc else ""))
+        cls.section(marker, title, desc)
 
     @staticmethod
     def notice(msg: str) -> None:
@@ -47,53 +83,84 @@ class GHA:
     def error(msg: str) -> None:
         print(f"::error::{msg}", flush=True)
 
+    # ── Banners ─────────────────────────────────────────────────────────────
+    @classmethod
+    def _banner(cls, glyph: str, title: str, color: str) -> None:
+        line = "═" * 58
+        print(flush=True)
+        print(cls._c(color, f"  ╓{line}"), flush=True)
+        print(
+            cls._c(color, "  ║  ")
+            + cls._c(color + C.BOLD, f"{glyph}  {title}"),
+            flush=True,
+        )
+        print(cls._c(color, f"  ╙{line}"), flush=True)
+        print(flush=True)
+
     @staticmethod
-    def _pad(text: str, width: int) -> str:
-        if len(text) > width:
-            text = text[:width - 1] + "…"
-        return text + " " * (width - len(text))
-
-    @classmethod
-    def _box_top(cls) -> None:
-        print(f"  ╔{'═' * (cls._W + 2)}╗", flush=True)
-
-    @classmethod
-    def _box_bot(cls) -> None:
-        print(f"  ╚{'═' * (cls._W + 2)}╝", flush=True)
-
-    @classmethod
-    def _box_div(cls) -> None:
-        print(f"  ╠{'═' * (cls._W + 2)}╣", flush=True)
-
-    @classmethod
-    def _box_title(cls, text: str) -> None:
-        inner = cls._pad(text, cls._W)
-        print(f"  ║  {inner}  ║", flush=True)
-
-    @classmethod
-    def _box_row(cls, label: str, value: str) -> None:
-        content = f"  {label:<24}{value}"
-        padded = cls._pad(content, cls._W)
-        print(f"  ║  {padded}  ║", flush=True)
-
-    @classmethod
-    def _box_blank(cls) -> None:
-        print(f"  ║{' ' * (cls._W + 4)}║", flush=True)
+    def _c(color: str, text: str) -> str:
+        return C.wrap(color, text)
 
     @classmethod
     def drone_header(cls, drone_idx: int, drone_total: int) -> None:
-        print(flush=True)
-        cls._box_top()
-        cls._box_title(f"🦇  SCARLET DEVIL NETWORK — DRONE {drone_idx} / {drone_total}")
-        cls._box_bot()
-        print(flush=True)
+        cls._banner("🦇", f"SCARLET DEVIL · DRONE {drone_idx}/{drone_total}", C.SCARLET)
 
     @classmethod
     def nexus_header(cls) -> None:
+        cls._banner("🩸", "SCARLET NEXUS · FINAL MERGE & PUBLISH", C.SCARLET)
+
+    # ── Tree sections & rows ────────────────────────────────────────────────
+    @classmethod
+    def section(cls, marker: str, title: str, desc: str = "") -> None:
+        """A phase header rendered as a tree trunk node."""
+        head = cls._c(C.SCARLET + C.BOLD, f"{marker} {title}")
+        if desc:
+            head += cls._c(C.GREY, f"  ·  {desc}")
+        print(cls._c(C.SCARLET, cls._BAR) + " " + head, flush=True)
+        print(cls._c(C.SCARLET, cls._BAR), flush=True)
+
+    @classmethod
+    def row(
+        cls,
+        label: str,
+        value: str = "",
+        last: bool = False,
+        status: str = "",
+    ) -> None:
+        """A tree branch row. status ∈ {'ok','warn','bad',''} colors the value."""
+        glyph = cls._END if last else cls._TEE
+        tree = cls._c(C.GREY, glyph)
+        lab = cls._c(C.GREY, f"{label:<16}")
+        vcolor = {
+            "ok": C.OK,
+            "warn": C.WARN,
+            "bad": C.BAD,
+        }.get(status, C.CYAN)
+        val = cls._c(vcolor, value) if value else ""
+        print(f"  {tree} {lab}{val}", flush=True)
+
+    @classmethod
+    def note(cls, text: str, last: bool = False) -> None:
+        """A free-text tree branch (no value column)."""
+        glyph = cls._END if last else cls._TEE
+        print(f"  {cls._c(C.GREY, glyph)} {cls._c(C.GREY, text)}", flush=True)
+
+    @classmethod
+    def blank(cls) -> None:
         print(flush=True)
-        cls._box_top()
-        cls._box_title("🩸  SCARLET NEXUS — FINAL MERGE & PUBLISH")
-        cls._box_bot()
+
+    # ── Summaries ───────────────────────────────────────────────────────────
+    @classmethod
+    def _summary(cls, title: str, rows: list, color: str) -> None:
+        print(flush=True)
+        print(cls._c(color + C.BOLD, f"  ◤ {title}"), flush=True)
+        n = len(rows)
+        for i, (label, value, status) in enumerate(rows):
+            if label == "---":
+                print(f"  {cls._c(C.GREY, cls._PIPE)}", flush=True)
+                continue
+            last = i == n - 1
+            cls.row(label, value, last=last, status=status)
         print(flush=True)
 
     @classmethod
@@ -109,23 +176,21 @@ class GHA:
         duration: float,
         dead_sources: int,
     ) -> None:
-        print(flush=True)
-        cls._box_top()
-        cls._box_title(f"DRONE {drone_idx} — MISSION COMPLETE")
-        cls._box_div()
-        cls._box_row("Parsed (shard)",        f"{parsed:>8,}  nodes")
-        cls._box_row("L4 killed",             f"{l4_dropped:>8,}  nodes")
-        cls._box_row("L7 alive",              f"{l7_alive:>8,}  nodes")
-        cls._box_row("Unique (post-dedup)",   f"{unique:>8,}  nodes")
-        cls._box_div()
-        cls._box_row("  └─ БС (whitelist)",   f"{bs_count:>8,}  nodes")
-        cls._box_row("  └─ ЧС (blacklist)",   f"{unique - bs_count:>8,}  nodes")
-        cls._box_div()
-        cls._box_row("⚡ Top speed",           f"{top_speed:>8.1f}  Mbps")
-        cls._box_row("🗑  Dead sources",        f"{dead_sources:>8,}")
-        cls._box_row("⏱  Duration",            f"{duration:>8.1f}  sec")
-        cls._box_bot()
-        print(flush=True)
+        survival = (l7_alive / parsed * 100) if parsed else 0.0
+        rows = [
+            ("parsed", f"{parsed:>8,} nodes", ""),
+            ("L4 killed", f"{l4_dropped:>8,} nodes", "warn"),
+            ("L7 alive", f"{l7_alive:>8,} nodes", "ok"),
+            ("unique", f"{unique:>8,} nodes  ({survival:.1f}% survival)", "ok"),
+            ("---", "", ""),
+            ("whitelist БС", f"{bs_count:>8,} nodes", ""),
+            ("blacklist ЧС", f"{unique - bs_count:>8,} nodes", ""),
+            ("---", "", ""),
+            ("⚡ top speed", f"{top_speed:>8.1f} Mbps", "ok"),
+            ("🗑 dead src", f"{dead_sources:>8,}", "warn" if dead_sources else ""),
+            ("⏱ duration", f"{duration:>8.1f} sec", ""),
+        ]
+        cls._summary(f"DRONE {drone_idx} · MISSION COMPLETE", rows, C.SCARLET)
 
     @classmethod
     def nexus_summary(
@@ -138,22 +203,20 @@ class GHA:
         dead_sources: int,
         durations: dict,
     ) -> None:
-        print(flush=True)
-        cls._box_top()
-        cls._box_title("NEXUS — PUBLISH COMPLETE")
-        cls._box_div()
-        cls._box_row("Total parsed",          f"{parsed:>8,}  nodes")
-        cls._box_row("L4 killed (all drones)",f"{l4_dropped:>8,}  nodes")
-        cls._box_row("Unique alive",          f"{unique_alive:>8,}  nodes")
-        cls._box_div()
-        cls._box_row("  └─ БС (whitelist)",   f"{bs_count:>8,}  nodes")
-        cls._box_row("  └─ ЧС (blacklist)",   f"{unique_alive - bs_count:>8,}  nodes")
-        cls._box_div()
-        cls._box_row("⚡ Top speed",           f"{top_speed:>8.1f}  Mbps")
-        cls._box_row("🗑  Dead sources",        f"{dead_sources:>8,}")
+        survival = (unique_alive / parsed * 100) if parsed else 0.0
+        rows = [
+            ("total parsed", f"{parsed:>8,} nodes", ""),
+            ("L4 killed", f"{l4_dropped:>8,} nodes", "warn"),
+            ("unique alive", f"{unique_alive:>8,} nodes  ({survival:.2f}% survival)", "ok"),
+            ("---", "", ""),
+            ("whitelist БС", f"{bs_count:>8,} nodes", ""),
+            ("blacklist ЧС", f"{unique_alive - bs_count:>8,} nodes", ""),
+            ("---", "", ""),
+            ("⚡ top speed", f"{top_speed:>8.1f} Mbps", "ok"),
+            ("🗑 dead src", f"{dead_sources:>8,}", "warn" if dead_sources else ""),
+        ]
         if durations:
-            cls._box_div()
+            rows.append(("---", "", ""))
             for shard_idx, dur in sorted(durations.items()):
-                cls._box_row(f"  Drone {shard_idx} duration", f"{dur:>8.1f}  sec")
-        cls._box_bot()
-        print(flush=True)
+                rows.append((f"drone {shard_idx}", f"{dur:>8.1f} sec", ""))
+        cls._summary("NEXUS · PUBLISH COMPLETE", rows, C.SCARLET)

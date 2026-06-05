@@ -140,8 +140,8 @@ func main() {
 	if len(nodes) > 0 {
 		survivalPct = float64(len(l4Nodes)) / float64(len(nodes)) * 100
 	}
-	fmt.Printf("✔[ФИЛЬТРАЦИЯ L4]: Отбраковано %d, Выжило: %d (%.2f%% survival)\n",
-		len(nodes)-len(l4Nodes), len(l4Nodes), survivalPct)
+	fmt.Printf("├─ %-16skilled %d · alive %d · %.1f%% survival\n",
+		"L4 filter", len(nodes)-len(l4Nodes), len(l4Nodes), survivalPct)
 
 	// If no L4 survivors, write output + stats and exit early
 	if len(l4Nodes) == 0 {
@@ -155,8 +155,8 @@ func main() {
 	if len(l4Nodes) > 0 {
 		l7Pct = float64(len(l7Nodes)) / float64(len(l4Nodes)) * 100
 	}
-	fmt.Printf("✔ [ИНСПЕКЦИЯ L7]: Завершена. Выжило узлов: %d (%.2f%% of L4 survivors)\n",
-		len(l7Nodes), l7Pct)
+	fmt.Printf("├─ %-16ssurvivors %d · %.1f%% of L4\n",
+		"L7 inspect", len(l7Nodes), l7Pct)
 
 	if len(l7Nodes) > 0 {
 		runChampionPhase(l7Nodes)
@@ -214,10 +214,11 @@ func writeCombinedStats() {
 	l7Total := l7.Total
 	l7Surv := l7.Survived
 	l7Dropped := l7Total - l7Surv
-	fmt.Printf("  L7 failure breakdown: total=%d dropped=%d survived=%d | "+
+	fmt.Printf("│  %-16stotal=%d dropped=%d survived=%d | "+
 		"http_timeout=%d http_tls=%d http_bad_status=%d http_other=%d | "+
 		"speed_timeout=%d speed_tls=%d speed_slow=%d speed_other=%d | "+
 		"singbox_crash=%d protocol_mismatch=%d\n",
+		"L7 breakdown",
 		l7Total, l7Dropped, l7Surv,
 		l7.HTTPTimeout, l7.HTTPTLSError, l7.HTTPBadStatus, l7.HTTPOtherError,
 		l7.SpeedTimeout, l7.SpeedTLSError, l7.SpeedTooSlow, l7.SpeedOtherError,
@@ -412,7 +413,7 @@ func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 		finalNodes = append(finalNodes, survivors...)
 
 		if batchNum%5 == 0 || batchNum == totalBatches {
-			fmt.Printf("► [ИНСПЕКЦИЯ L7]: Батч %d/%d завершен (Выжило: %d)\n",
+			fmt.Printf("│  L7 batch %d/%d · alive %d\n",
 				batchNum, totalBatches, len(survivors))
 		}
 	}
@@ -899,7 +900,7 @@ func runChampionPhase(nodes []map[string]interface{}) {
 	if len(nodes) < limit {
 		limit = len(nodes)
 	}
-	fmt.Printf("►[ANGRA-GO CHAMPION]: Старт 10MB спидтеста для Топ-%d\n", limit)
+	fmt.Printf("├─ %-16s10MB speed test · top-%d\n", "champion", limit)
 
 	for i := 0; i < limit; i++ {
 		res, crashed := processSingboxBatch(

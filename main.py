@@ -24,7 +24,7 @@ async def main() -> None:
     GHA.drone_header(shard_index + 1, shard_count)
 
     try:
-        GHA.group(f"① BASES — Loading RKN / TSPU Whitelists")
+        GHA.phase("①", "BASES", "Loading RKN / TSPU whitelists")
         await RKNValidator.load_lists()
         GHA.endgroup()
 
@@ -44,27 +44,28 @@ async def main() -> None:
             # This ensures nodes from all sources are spread evenly across drones,
             # preventing high-yield source clusters from landing entirely on one shard.
             nodes = all_nodes[shard_index::shard_count]
-            logger.info(
-                f"  Shard {shard_index + 1}/{shard_count} — "
-                f"round-robin slice — "
-                f"({len(nodes):,} / {len(all_nodes):,} nodes)"
-            )
         else:
             nodes = all_nodes
 
-        logger.info(f"  Total collected  {len(all_nodes):>8,}  nodes")
-        logger.info(f"  Shard workload   {len(nodes):>8,}  nodes")
+        GHA.section("②", "PARSE", "Fetching & decoding sources")
+        GHA.row("collected", f"{len(all_nodes):>8,} nodes")
+        if shard_count > 1:
+            GHA.row(
+                f"shard {shard_index + 1}/{shard_count}",
+                f"{len(nodes):>8,} nodes  (round-robin slice)",
+                last=True,
+            )
+        else:
+            GHA.row("workload", f"{len(nodes):>8,} nodes", last=True)
         GHA.endgroup()
 
-        GHA.group("③ ENGINE — L4 TCP · L7 sing-box · Champion Speed Test")
+        GHA.phase("③", "ENGINE", "L4 TCP · L7 sing-box · champion speed test")
         inspector = Inspector()
         alive_nodes = await inspector.process_all(nodes)
         l4_dropped = inspector.l4_dropped
         GHA.endgroup()
 
-        GHA.group("④ AGGREGATE — Metrics & Deduplication")
-
-        logger.info(f"  L7 alive (raw)   {len(alive_nodes):>8,}  nodes")
+        GHA.phase("④", "AGGREGATE", "Metrics & deduplication")
 
         for node in alive_nodes:
             if node.source_url in parser.metrics:
@@ -90,6 +91,7 @@ async def main() -> None:
             if m.get("parsed", 0) > 0 and m.get("alive", 0) == 0
         ]
 
+        raw_alive = len(alive_nodes)
         unique_alive: dict = {}
         for n in alive_nodes:
             unique_alive[n.strict_id] = n
@@ -119,17 +121,18 @@ async def main() -> None:
         sorted_countries = sorted(country_counts.items(), key=lambda x: x[1], reverse=True)[:10]
         country_stats = [{"code": cc, "count": cnt, "flag": ""} for cc, cnt in sorted_countries]
 
-        logger.info(f"  Unique alive     {len(alive_nodes):>8,}  nodes")
-        logger.info(f"  БС (whitelist)   {bs_count:>8,}  nodes")
-        logger.info(f"  ЧС (blacklist)   {len(alive_nodes) - bs_count:>8,}  nodes")
-        logger.info(f"  Dead sources     {len(dead_sources):>8,}")
-        logger.info(f"  ⚡ Top speed      {top_speed:>8.1f}  Mbps")
-        logger.info(f"  📊 Avg/Med/P90    {avg_speed:>6.1f} / {median_speed:>6.1f} / {speed_p90:>6.1f}  Mbps")
+        GHA.row("L7 alive", f"{raw_alive:>8,} nodes", status="ok")
+        GHA.row("unique", f"{len(alive_nodes):>8,} nodes")
+        GHA.row("whitelist БС", f"{bs_count:>8,} nodes")
+        GHA.row("blacklist ЧС", f"{len(alive_nodes) - bs_count:>8,} nodes")
+        GHA.row("dead sources", f"{len(dead_sources):>8,}", status="warn" if dead_sources else "")
+        GHA.row("⚡ top speed", f"{top_speed:>8.1f} Mbps", status="ok")
+        GHA.row("📊 avg/med/p90", f"{avg_speed:.1f} / {median_speed:.1f} / {speed_p90:.1f} Mbps")
         top_countries_str = ', '.join(f"{c['code']}:{c['count']}" for c in country_stats[:5])
-        logger.info(f"  🌍 Top countries  {len(country_stats)}  ({top_countries_str})")
+        GHA.row("🌍 countries", f"{len(country_stats)}  ({top_countries_str})", last=True)
         GHA.endgroup()
 
-        GHA.group("⑤ EXPORT — Writing Subscription Files")
+        GHA.phase("⑤", "EXPORT", "Writing subscription files")
         duration = time.perf_counter() - start_time
         Exporter.save_files(
             alive_nodes,

@@ -11,6 +11,7 @@ from loguru import logger
 from typing import List, Optional, Dict
 from core.models import ProxyNode
 from core.settings import CONFIG
+from core.logger import GHA
 
 
 class BatchEngine:
@@ -170,8 +171,8 @@ class Inspector:
         }
         self.l4_retry_attempts = stats.get("retry_attempts", 0)
         self.l4_retry_recovered = stats.get("retry_recovered", 0)
-        logger.info(
-            f"  L4 failure breakdown: {self.l4_failure_reasons} | "
+        GHA.note(
+            f"L4 stats        {self.l4_failure_reasons} | "
             f"retries={self.l4_retry_attempts} recovered={self.l4_retry_recovered}"
         )
 
@@ -185,8 +186,8 @@ class Inspector:
         self.l7_survived = l7.get("survived", 0)
         l7_dropped = self.l7_total - self.l7_survived
         l7_pct = (self.l7_survived / self.l7_total * 100) if self.l7_total > 0 else 0.0
-        logger.info(
-            f"  L7 failure breakdown: total={self.l7_total} dropped={l7_dropped} "
+        GHA.note(
+            f"L7 stats        total={self.l7_total} dropped={l7_dropped} "
             f"survived={self.l7_survived} ({l7_pct:.1f}%) | "
             f"http_timeout={l7.get('http_timeout', 0)} "
             f"http_tls_error={l7.get('http_tls_error', 0)} "
@@ -201,7 +202,7 @@ class Inspector:
         )
 
     async def _resolve_geo(self, nodes: List[ProxyNode]) -> None:
-        logger.info("  GeoIP: разрешение DNS...")
+        GHA.row("GeoIP", "resolving DNS…")
         if not nodes:
             return
 
@@ -233,9 +234,9 @@ class Inspector:
                 ips_to_fetch.append(ip)
                 seen.add(ip)
 
-        logger.info(
-            f"  GeoIP: DNS resolved {len(node_ip_pairs)} nodes, "
-            f"fetching {len(ips_to_fetch)} unique IPs..."
+        GHA.row(
+            "GeoIP",
+            f"resolved {len(node_ip_pairs)} nodes · fetching {len(ips_to_fetch)} IPs",
         )
 
         GEO_BATCH = 100
@@ -279,10 +280,10 @@ class Inspector:
             node.country = BatchEngine._GEO_CACHE.get(ip, "UN")
 
         assigned = sum(1 for n in nodes if n.country != "UN")
-        logger.info(f"  GeoIP: flags assigned {assigned}/{len(nodes)}")
+        GHA.row("GeoIP", f"flags assigned {assigned}/{len(nodes)}", last=True, status="ok")
 
     async def process_all(self, nodes: List[ProxyNode]) -> List[ProxyNode]:
-        logger.info(f"  Подготовка {len(nodes):,} узлов для передачи в ANGRA-CORE...")
+        GHA.row("prepare", f"{len(nodes):,} nodes → ANGRA-CORE")
 
         os.makedirs("data", exist_ok=True)
         uid = uuid.uuid4().hex[:8]
@@ -300,9 +301,9 @@ class Inspector:
             else:
                 self.l4_dropped += 1
 
-        logger.info(
-            f"  Транслировано outbounds: {len(payload_nodes):,}  "
-            f"(отклонено при трансляции: {self.l4_dropped:,})"
+        GHA.row(
+            "translate",
+            f"{len(payload_nodes):,} outbounds  (rejected {self.l4_dropped:,})",
         )
 
         payload = {
@@ -333,7 +334,7 @@ class Inspector:
             binary = f"go_core/angra_core{ext}"
 
             if not os.path.exists(binary):
-                logger.info("  Компиляция ANGRA-CORE (первый запуск)...")
+                GHA.row("compile", "building ANGRA-CORE (first run)…")
                 subprocess.run(
                     ["go", "mod", "init", "angra_core"],
                     cwd="go_core", check=False, capture_output=True,
@@ -344,7 +345,7 @@ class Inspector:
                     ["go", "build", "-ldflags", "-s -w", "-o", f"angra_core{ext}", "main.go"],
                     cwd="go_core", check=True,
                 )
-                logger.info("  Компиляция завершена.")
+                GHA.row("compile", "done ✔", status="ok")
 
             proc = await asyncio.create_subprocess_exec(
                 f"./angra_core{ext}", f"../{input_file}", f"../{output_file}", f"../{stats_file}",
