@@ -69,7 +69,7 @@ async def main() -> None:
         await RKNValidator.load_lists()
         GHA.endgroup()
 
-        GHA.group("② PARSE — Fetching & Decoding Subscription Sources")
+        GHA.phase("②", "PARSE", "Fetching & decoding sources")
         source_health = SourceHealth(shard_index=shard_index if shard_count > 1 else -1)
         nodes_file = os.environ.get("NODES_FILE", "")
         if nodes_file:
@@ -124,7 +124,6 @@ async def main() -> None:
         else:
             nodes = all_nodes
 
-        GHA.section("②", "PARSE", "Fetching & decoding sources")
         GHA.row("collected", f"{len(all_nodes):>8,} nodes")
         if shard_count > 1:
             GHA.row(

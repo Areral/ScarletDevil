@@ -51,25 +51,33 @@ class C:
 
 class GHA:
     # Tree glyphs
-    _BAR = "┃"
     _TEE = "├─"
     _END = "└─"
     _PIPE = "│"
 
-    # ── GitHub Actions log folding ──────────────────────────────────────────
-    @staticmethod
-    def group(title: str) -> None:
-        print(f"::group::{title}", flush=True)
+    # True only inside GitHub Actions, where ::group::/::endgroup:: are real
+    # workflow commands. Elsewhere we print a plain styled header instead of the
+    # literal "::group::…" text so local runs stay readable.
+    _GHA = os.environ.get("GITHUB_ACTIONS") == "true"
 
-    @staticmethod
-    def endgroup() -> None:
-        print("::endgroup::", flush=True)
+    # ── GitHub Actions log folding ──────────────────────────────────────────
+    @classmethod
+    def group(cls, title: str) -> None:
+        if cls._GHA:
+            print(f"::group::{title}", flush=True)
+        else:
+            print(flush=True)
+            print(cls._c(C.SCARLET + C.BOLD, title), flush=True)
+
+    @classmethod
+    def endgroup(cls) -> None:
+        if cls._GHA:
+            print("::endgroup::", flush=True)
 
     @classmethod
     def phase(cls, marker: str, title: str, desc: str = "") -> None:
-        """Open a GitHub Actions fold AND render the tree trunk header."""
+        """Open one collapsible phase header (a GitHub Actions fold in CI)."""
         cls.group(f"{marker} {title}" + (f" — {desc}" if desc else ""))
-        cls.section(marker, title, desc)
 
     @staticmethod
     def notice(msg: str) -> None:
@@ -109,16 +117,7 @@ class GHA:
     def nexus_header(cls) -> None:
         cls._banner("🩸", "SCARLET NEXUS · FINAL MERGE & PUBLISH", C.SCARLET)
 
-    # ── Tree sections & rows ────────────────────────────────────────────────
-    @classmethod
-    def section(cls, marker: str, title: str, desc: str = "") -> None:
-        """A phase header rendered as a tree trunk node."""
-        head = cls._c(C.SCARLET + C.BOLD, f"{marker} {title}")
-        if desc:
-            head += cls._c(C.GREY, f"  ·  {desc}")
-        print(cls._c(C.SCARLET, cls._BAR) + " " + head, flush=True)
-        print(cls._c(C.SCARLET, cls._BAR), flush=True)
-
+    # ── Tree rows ───────────────────────────────────────────────────────────
     @classmethod
     def row(
         cls,

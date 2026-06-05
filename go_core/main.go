@@ -410,7 +410,7 @@ func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 		survivors := processSingboxRecursive(batch, false, 0)
 		finalNodes = append(finalNodes, survivors...)
 
-		if batchNum%5 == 0 || batchNum == totalBatches {
+		if batchNum%20 == 0 || batchNum == totalBatches {
 			fmt.Printf("│  L7 batch %d/%d · alive %d\n",
 				batchNum, totalBatches, len(survivors))
 		}
