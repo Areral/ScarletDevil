@@ -143,9 +143,17 @@ jobs:
         run: |
           git config --global user.name "Scarlet Devil Bot"
           git config --global user.email "bot@scarletdevil.net"
-          git add index.html sub_all.txt sub_bs.txt sub_chs.txt sub_ru.txt \
+
+          # Stage only the artifacts that actually exist this run. A hard
+          # `git add a b c` aborts with exit 1 if ANY path is missing (e.g.
+          # sub_ru.txt when the RU probe is empty, or data/pool.json on the very
+          # first run) — which previously crashed the whole merge job.
+          PUBLISH_FILES="index.html sub_all.txt sub_bs.txt sub_chs.txt sub_ru.txt \
                   sub_vless.txt sub_vmess.txt sub_trojan.txt sub_ss.txt sub_hy2.txt \
-                  data/source_health.json data/pool.json
+                  data/source_health.json data/pool.json"
+          for f in $PUBLISH_FILES; do
+            [ -f "$f" ] && git add "$f" || echo "skip (missing): $f"
+          done
 
           if git diff --staged --quiet; then
             echo "No changes to publish."
