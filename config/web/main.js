@@ -955,6 +955,79 @@ const PLATFORM_META = {
 let currentPlatform = 'windows';
 let currentAppId = PLATFORMS['windows'][0];
 
+// --- UNIFIED MOTION HELPERS ("Алый ритм") ---
+var PREFERS_REDUCED = (function () {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (e) { return false; }
+})();
+
+// Eased count-up from 0 to `target`. Instant under reduced-motion.
+function animateCount(el, target, opts) {
+    opts = opts || {};
+    var decimals = opts.decimals || 0;
+    var dur = opts.duration || 800;
+    var fmt = function (v) { return v.toFixed(decimals); };
+    if (PREFERS_REDUCED || !target || target <= 0) {
+        el.textContent = fmt(target || 0);
+        return;
+    }
+    var start = null;
+    function frame(ts) {
+        if (start === null) start = ts;
+        var p = Math.min((ts - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);   // easeOutCubic — matches --ease-scarlet
+        el.textContent = fmt(target * eased);
+        if (p < 1) requestAnimationFrame(frame);
+        else el.textContent = fmt(target);
+    }
+    requestAnimationFrame(frame);
+}
+
+// Draw a sparkline into an inline <svg> from a numeric series.
+function drawSparkline(svg, series) {
+    if (!svg || !series || series.length < 2) {
+        if (svg) svg.style.display = 'none';
+        return;
+    }
+    var w = 100, h = 28, pad = 2;
+    var min = Math.min.apply(null, series), max = Math.max.apply(null, series);
+    var span = (max - min) || 1;
+    var step = (w - pad * 2) / (series.length - 1);
+    var pts = series.map(function (v, i) {
+        var x = pad + i * step;
+        var y = h - pad - ((v - min) / span) * (h - pad * 2);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    // Safe innerHTML: `pts` are number.toFixed(1) strings only (values pass
+    // through Math.min/max + arithmetic + toFixed), and the rest is static
+    // markup — no untrusted string reaches the DOM here.
+    svg.innerHTML =
+        '<defs><linearGradient id="spark-grad" x1="0" y1="0" x2="1" y2="0">' +
+        '<stop offset="0%" stop-color="var(--touhou-crimson)"/>' +
+        '<stop offset="100%" stop-color="var(--touhou-red-glow)"/></linearGradient></defs>' +
+        '<polyline points="' + pts.join(' ') + '" fill="none" ' +
+        'stroke="url(#spark-grad)" stroke-width="1.5" ' +
+        'stroke-linecap="round" stroke-linejoin="round"/>';
+    var line = svg.querySelector('polyline');
+    if (line && !PREFERS_REDUCED) {
+        var len = line.getTotalLength ? line.getTotalLength() : 200;
+        line.style.strokeDasharray = len;
+        line.style.strokeDashoffset = len;
+        line.style.transition = 'stroke-dashoffset var(--motion-slow) var(--ease-scarlet)';
+        requestAnimationFrame(function () { line.style.strokeDashoffset = '0'; });
+    }
+}
+
+// Read the embedded node-stats blob once (null if absent/unsubstituted).
+function readNodeStats() {
+    var el = document.getElementById('stats-data');
+    if (!el) return null;
+    var raw = el.getAttribute('data-node-stats');
+    if (!raw || raw.indexOf('{{') !== -1) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
 // --- ROBUSTNESS: never leak raw template tokens to a visitor ---
 // Server-side substitution (merge.py::build_html) normally fills every token.
 // If a stale or un-substituted index.html ever ships, this fills the hero stats
