@@ -966,7 +966,8 @@ function animateCount(el, target, opts) {
     opts = opts || {};
     var decimals = opts.decimals || 0;
     var dur = opts.duration || 800;
-    var fmt = function (v) { return v.toFixed(decimals); };
+    var suffix = opts.suffix || '';
+    var fmt = function (v) { return v.toFixed(decimals) + suffix; };
     if (PREFERS_REDUCED || !target || target <= 0) {
         el.textContent = fmt(target || 0);
         return;
@@ -1989,13 +1990,23 @@ function initStats() {
 
     var maxCount = Math.max(counts.vless, counts.vmess, counts.trojan, counts.ss, counts.hy2, 1);
 
-    // Render protocol bars
-    function setBar(id, val) {
+    // Render protocol bars — staggered growth on the shared motion rhythm.
+    var barIndex = 0;
+    function growBar(id, val, scale) {
         var bar = document.getElementById(id);
         var valEl = document.getElementById('val-' + id.split('-')[1]);
-        if (bar) bar.style.width = (val / maxCount * 100) + '%';
-        if (valEl) valEl.textContent = val;
+        var delay = (barIndex++) * 60;          // --stagger-step
+        if (bar) {
+            if (PREFERS_REDUCED) {
+                bar.style.width = (val / scale * 100) + '%';
+            } else {
+                bar.style.transition = 'width var(--motion-base) var(--ease-scarlet) ' + delay + 'ms';
+                requestAnimationFrame(function () { bar.style.width = (val / scale * 100) + '%'; });
+            }
+        }
+        if (valEl) animateCount(valEl, val);
     }
+    function setBar(id, val) { growBar(id, val, maxCount); }
     setBar('bar-vless', counts.vless);
     setBar('bar-vmess', counts.vmess);
     setBar('bar-trojan', counts.trojan);
@@ -2004,12 +2015,7 @@ function initStats() {
 
     // Render class bars
     var maxClass = Math.max(counts.bs, counts.chs, 1);
-    function setClassBar(id, val) {
-        var bar = document.getElementById(id);
-        var valEl = document.getElementById('val-' + id.split('-')[1]);
-        if (bar) bar.style.width = (val / maxClass * 100) + '%';
-        if (valEl) valEl.textContent = val;
-    }
+    function setClassBar(id, val) { growBar(id, val, maxClass); }
     setClassBar('bar-bs', counts.bs);
     setClassBar('bar-chs', counts.chs);
 
@@ -2061,12 +2067,19 @@ function initStats() {
     var sumP90 = document.getElementById('sum-p90-speed');
     var sumTotal = document.getElementById('sum-total');
     var sumBS = document.getElementById('sum-bs');
-    if (sumMax) sumMax.textContent = maxSpeed + ' Mbps';
-    if (sumAvg) sumAvg.textContent = avgSpeed + ' Mbps';
-    if (sumMed) sumMed.textContent = medianSpeed + ' Mbps';
-    if (sumP90) sumP90.textContent = speedP90 + ' Mbps';
-    if (sumTotal) sumTotal.textContent = totalNodes;
-    if (sumBS) sumBS.textContent = counts.bs;
+    // Count-up summaries, preserving units and the "—" no-data fallback.
+    function setSummary(el, val, decimals, suffix) {
+        if (!el) return;
+        var n = parseFloat(val);
+        if (isNaN(n)) { el.textContent = val; return; }   // "—"
+        animateCount(el, n, { decimals: decimals, suffix: suffix });
+    }
+    setSummary(sumMax, maxSpeed, 0, ' Mbps');
+    setSummary(sumAvg, avgSpeed, 1, ' Mbps');
+    setSummary(sumMed, medianSpeed, 1, ' Mbps');
+    setSummary(sumP90, speedP90, 1, ' Mbps');
+    setSummary(sumTotal, totalNodes, 0, '');
+    if (sumBS) animateCount(sumBS, counts.bs);
 }
 
 init();
