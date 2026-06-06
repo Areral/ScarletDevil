@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -26,6 +27,7 @@ type EngineSettings struct {
 	MinSpeed         float64  `json:"min_speed"`
 	SpeedAsFilter    bool     `json:"speed_as_filter"`
 	SpeedConcurrency int      `json:"speed_concurrency"`
+	L7Concurrency    int      `json:"l7_concurrency"`
 	ConnectivityUrls []string `json:"connectivity_urls"`
 	SpeedtestUrl     string   `json:"speedtest_url"`
 	ChampionTestUrl  string   `json:"champion_test_url"`
@@ -48,6 +50,13 @@ var (
 
 	portCounter = 10000
 	portMutex   sync.Mutex
+
+	// globalSpeedSem bounds the TOTAL number of concurrent speed-test
+	// downloads across ALL parallel L7 batches. It is a single shared cap so
+	// that raising L7 batch parallelism never multiplies bandwidth contention
+	// on the runner's single uplink (see AUDIT §2.4). Sized by speed_concurrency
+	// and initialised once in main().
+	globalSpeedSem chan struct{}
 
 	// L4 failure reason counters (reset per l4 phase)
 	l4Stats   L4Stats
@@ -135,6 +144,13 @@ func main() {
 	if globalSettings.BatchSize <= 0 {
 		globalSettings.BatchSize = 150
 	}
+
+	// Global download-concurrency cap shared by every parallel L7 batch.
+	speedCap := globalSettings.SpeedConcurrency
+	if speedCap <= 0 {
+		speedCap = 12
+	}
+	globalSpeedSem = make(chan struct{}, speedCap)
 
 	nodes := payload.Nodes
 
@@ -389,6 +405,19 @@ func checkL4(node map[string]interface{}) (bool, string) {
 	return false, "timeout"
 }
 
+// l7Brief returns a compact snapshot of the running L7 failure counters so a
+// run that is cancelled mid-phase still shows WHY nodes are being dropped
+// (crash vs ping-timeout vs protocol-mismatch) on every logged batch line.
+func l7Brief() string {
+	l7StatsMu.Lock()
+	s := l7Stats
+	l7StatsMu.Unlock()
+	return fmt.Sprintf(
+		"crash=%d proto_mismatch=%d ping_timeout=%d ping_tls=%d ping_bad=%d ping_other=%d",
+		s.SingboxCrash, s.ProtocolMismatch,
+		s.HTTPTimeout, s.HTTPTLSError, s.HTTPBadStatus, s.HTTPOtherError)
+}
+
 func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 	// Initialize L7 stats
 	l7StatsMu.Lock()
@@ -397,9 +426,35 @@ func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 
 	batchSize := globalSettings.BatchSize
 	totalBatches := (len(nodes) + batchSize - 1) / batchSize
-	finalNodes := make([]map[string]interface{}, 0, len(nodes)/3)
+
+	// Number of sing-box batches inspected concurrently. Each instance still
+	// handles batchSize nodes; only the WALL-CLOCK of the (mostly ping-timeout
+	// bound) phase shrinks. Bandwidth stays bounded by globalSpeedSem, so this
+	// speeds the phase up without choking the uplink.
+	l7Conc := globalSettings.L7Concurrency
+	if l7Conc <= 0 {
+		l7Conc = 4
+	}
+	if l7Conc > totalBatches {
+		l7Conc = totalBatches
+	}
+
+	fmt.Printf("│  L7 start · %d batches × %d nodes · %d parallel sing-box · %d global download slots\n",
+		totalBatches, batchSize, l7Conc, cap(globalSpeedSem))
+
+	var (
+		finalNodes = make([]map[string]interface{}, 0, len(nodes)/3)
+		mu         sync.Mutex
+		wg         sync.WaitGroup
+		fatalFlag  int32
+		completed  int32
+	)
+	sem := make(chan struct{}, l7Conc)
 
 	for i := 0; i < len(nodes); i += batchSize {
+		if atomic.LoadInt32(&fatalFlag) == 1 {
+			break
+		}
 		end := i + batchSize
 		if end > len(nodes) {
 			end = len(nodes)
@@ -407,14 +462,37 @@ func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 		batch := nodes[i:end]
 		batchNum := (i / batchSize) + 1
 
-		survivors := processSingboxRecursive(batch, false, 0)
-		finalNodes = append(finalNodes, survivors...)
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(b []map[string]interface{}, bn int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if atomic.LoadInt32(&fatalFlag) == 1 {
+				return
+			}
 
-		if batchNum%20 == 0 || batchNum == totalBatches {
-			fmt.Printf("│  L7 batch %d/%d · alive %d\n",
-				batchNum, totalBatches, len(survivors))
-		}
+			survivors, fatal := processSingboxRecursive(b, false, 0)
+			if fatal {
+				// sing-box is unrunnable (binary missing) — splitting cannot
+				// help. Abort the phase instead of grinding every batch.
+				if atomic.CompareAndSwapInt32(&fatalFlag, 0, 1) {
+					fmt.Printf("│  L7 ABORT · sing-box could not be started (binary missing / unrunnable). Skipping remaining batches.\n")
+				}
+				return
+			}
+
+			mu.Lock()
+			finalNodes = append(finalNodes, survivors...)
+			mu.Unlock()
+
+			done := int(atomic.AddInt32(&completed, 1))
+			if done%20 == 0 || done == totalBatches {
+				fmt.Printf("│  L7 %d/%d · batch#%d alive %d · [%s]\n",
+					done, totalBatches, bn, len(survivors), l7Brief())
+			}
+		}(batch, batchNum)
 	}
+	wg.Wait()
 
 	// Finalize L7 survived count
 	l7StatsMu.Lock()
@@ -424,39 +502,66 @@ func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 	return finalNodes
 }
 
+// processSingboxRecursive inspects a batch, splitting in half on a (retryable)
+// sing-box crash to isolate a poison node. The second return value is a FATAL
+// flag: when true, sing-box itself is unrunnable (binary missing) and the
+// caller must abort the whole phase rather than keep splitting.
+//
+// All crash telemetry is owned here (counted exactly once at the leaves) so it
+// is not inflated by counting at every level of the split.
 func processSingboxRecursive(
 	batch []map[string]interface{},
 	isChampion bool,
 	depth int,
-) []map[string]interface{} {
+) ([]map[string]interface{}, bool) {
 	if len(batch) == 0 {
-		return nil
+		return nil, false
 	}
 	if depth > 3 {
 		// Recursive splitting exhausted — nodes could not be checked
 		l7StatsMu.Lock()
 		l7Stats.SingboxCrash += len(batch)
 		l7StatsMu.Unlock()
-		return nil
+		return nil, false
 	}
 
-	survivors, crashed := processSingboxBatch(batch, isChampion)
+	survivors, crashed, fatal := processSingboxBatch(batch, isChampion)
+	if fatal {
+		// Environmental: sing-box cannot run at all. Count the batch and signal
+		// abort up the stack — no point splitting.
+		l7StatsMu.Lock()
+		l7Stats.SingboxCrash += len(batch)
+		l7StatsMu.Unlock()
+		return nil, true
+	}
 	if crashed {
 		if len(batch) == 1 {
-			return nil
+			// Single poison node that crashes sing-box — drop it, but record it
+			// so the loss is visible in telemetry (was silent before).
+			l7StatsMu.Lock()
+			l7Stats.SingboxCrash++
+			l7StatsMu.Unlock()
+			return nil, false
 		}
 		mid := len(batch) / 2
-		left := processSingboxRecursive(batch[:mid], isChampion, depth+1)
-		right := processSingboxRecursive(batch[mid:], isChampion, depth+1)
-		return append(left, right...)
+		left, lf := processSingboxRecursive(batch[:mid], isChampion, depth+1)
+		if lf {
+			return left, true
+		}
+		right, rf := processSingboxRecursive(batch[mid:], isChampion, depth+1)
+		return append(left, right...), rf
 	}
-	return survivors
+	return survivors, false
 }
 
+// processSingboxBatch runs one sing-box over the batch and returns
+// (survivors, crashed, fatal). crashed=true means sing-box never became ready
+// (retryable by splitting); fatal=true means the binary could not be started at
+// all (environmental — caller should abort the phase).
 func processSingboxBatch(
 	batch []map[string]interface{},
 	isChampion bool,
-) ([]map[string]interface{}, bool) {
+) ([]map[string]interface{}, bool, bool) {
 
 	basePort := getNextBasePort(len(batch))
 	inbounds := make([]map[string]interface{}, 0, len(batch))
@@ -506,7 +611,7 @@ func processSingboxBatch(
 		l7StatsMu.Lock()
 		l7Stats.ProtocolMismatch += len(batch)
 		l7StatsMu.Unlock()
-		return nil, false
+		return nil, false, false
 	}
 
 	outbounds = append(outbounds,
@@ -549,31 +654,50 @@ func processSingboxBatch(
 
 	cmd := exec.Command("sing-box", "run", "-c", configPath)
 	if err := cmd.Start(); err != nil {
-		return nil, true
+		// Binary missing / unrunnable — fatal & environmental, not a per-node
+		// fault. Signalled up so the phase aborts instead of splitting for hours.
+		return nil, true, true
 	}
+	// Reap the process in a goroutine so the readiness loop can break the instant
+	// sing-box dies (e.g. a poison outbound) instead of burning the full deadline.
+	exited := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(exited)
+	}()
 	defer func() {
 		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
+		<-exited
 	}()
 
 	portReady := false
-	deadline := time.Now().Add(8 * time.Second) // increased from 5s
+	deadline := time.Now().Add(8 * time.Second)
+portWait:
 	for time.Now().Before(deadline) {
+		select {
+		case <-exited:
+			// sing-box died before binding — stop waiting immediately.
+			break portWait
+		default:
+		}
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", firstValidPort), 300*time.Millisecond)
 		if err == nil {
 			conn.Close()
 			portReady = true
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-exited:
+			break portWait
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
 
 	if !portReady {
-		// Sing-box failed to start — track all nodes in batch
-		l7StatsMu.Lock()
-		l7Stats.SingboxCrash += len(batch)
-		l7StatsMu.Unlock()
-		return nil, true
+		// Never became ready (crash or poison node) — retryable via split.
+		// Crash telemetry is owned by processSingboxRecursive (counted at the
+		// leaves) to avoid inflating it at every split level.
+		return nil, true, false
 	}
 	time.Sleep(200 * time.Millisecond)
 
@@ -613,21 +737,16 @@ func processSingboxBatch(
 	wgPing.Wait()
 
 	if len(pingPassed) == 0 {
-		return nil, false
+		return nil, false, false
 	}
 
 	var wgSpeed sync.WaitGroup
 	alive := make([]map[string]interface{}, 0, len(pingPassed))
 
-	// Speed-test concurrency is configurable to lower contention for the
-	// runner's single uplink (40 parallel downloads understated speed and
-	// caused alive nodes to be dropped — see AUDIT §2.4). Default 12.
-	speedConcurrency := globalSettings.SpeedConcurrency
-	if speedConcurrency <= 0 {
-		speedConcurrency = 12
-	}
-	semSpeed := make(chan struct{}, speedConcurrency)
-
+	// Downloads are throttled by the package-global globalSpeedSem (sized by
+	// speed_concurrency) rather than a per-batch semaphore, so running several
+	// L7 batches in parallel never multiplies bandwidth contention on the
+	// runner's single uplink (see AUDIT §2.4).
 	minSpeed := globalSettings.MinSpeed
 	if minSpeed <= 0 {
 		minSpeed = 1.0
@@ -635,10 +754,10 @@ func processSingboxBatch(
 
 	for port, node := range pingPassed {
 		wgSpeed.Add(1)
-		semSpeed <- struct{}{}
+		globalSpeedSem <- struct{}{}
 		go func(p int, n map[string]interface{}) {
 			defer wgSpeed.Done()
-			defer func() { <-semSpeed }()
+			defer func() { <-globalSpeedSem }()
 			verifySSL := resolvePayloadSSL(n)
 			speed, ok, reason := testHTTPSpeed(p, verifySSL, isChampion)
 			// Speed is always recorded for sorting/labels; a failed
@@ -676,7 +795,7 @@ func processSingboxBatch(
 	}
 	wgSpeed.Wait()
 
-	return alive, false
+	return alive, false, false
 }
 
 func getSocksClient(port int, timeout time.Duration, verifySSL bool) *http.Client {
@@ -920,7 +1039,7 @@ func runChampionPhase(nodes []map[string]interface{}) {
 	fmt.Printf("├─ %-16s10MB speed test · top-%d\n", "champion", limit)
 
 	for i := 0; i < limit; i++ {
-		res, crashed := processSingboxBatch(
+		res, crashed, _ := processSingboxBatch(
 			[]map[string]interface{}{nodes[i]}, true,
 		)
 		if !crashed && len(res) > 0 {

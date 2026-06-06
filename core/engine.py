@@ -352,6 +352,7 @@ class Inspector:
                 "min_speed":   CONFIG.checking.get("min_speed", 1.0),
                 "speed_as_filter": CONFIG.checking.get("speed_as_filter", False),
                 "speed_concurrency": CONFIG.checking.get("speed_concurrency", 12),
+                "l7_concurrency": CONFIG.checking.get("l7_concurrency", 4),
                 "connectivity_urls": CONFIG.checking.get(
                     "connectivity_urls", ["http://cp.cloudflare.com/generate_204"]
                 ),
