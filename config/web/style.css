@@ -32,6 +32,13 @@
     --trans: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
     --trans-fast: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 
+    /* --- Unified motion system ("Алый ритм") --- */
+    --ease-scarlet: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-fast: 0.2s;
+    --motion-base: 0.4s;
+    --motion-slow: 0.8s;
+    --stagger-step: 60ms;
+
     /* Theme foundation — override via data-theme */
     --theme-glow-primary: var(--touhou-red-glow);
     --theme-glow-secondary: var(--touhou-purple-glow);
@@ -1550,3 +1557,14 @@ section:last-of-type { border-bottom: none; }
 /* Navigation buttons */
 .wizard-nav { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
 .wizard-nav .btn-secondary, .wizard-nav .btn-primary { width: auto; flex: 1 1 auto; max-width: none; }
+
+/* One global switch: visitors who ask for less motion get final states only. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+    .hero-sparkline, .scan-sweep { display: none !important; }
+}
