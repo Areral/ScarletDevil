@@ -44,7 +44,11 @@ class BatchEngine:
                 if not c.uuid or not is_valid_uuid(c.uuid):
                     return None
                 base.update({"type": "vless", "uuid": c.uuid})
-                if c.flow:
+                # xtls-rprx-vision is valid ONLY over raw TCP+TLS. Paired with a
+                # ws/grpc/http transport, sing-box 1.12 REJECTS the config and the
+                # whole batch's sing-box crashes (see SagerNet/sing-box#3258).
+                # Emit flow only on raw TCP.
+                if c.flow and c.type in ("tcp", "raw"):
                     base["flow"] = c.flow
 
             elif node.protocol == "vmess":
@@ -70,13 +74,54 @@ class BatchEngine:
                     "method": c.method.lower(),
                     "password": c.password,
                 })
+                # SIP003 plugin (obfs). sing-box supports only obfs-local and
+                # v2ray-plugin; the URI carries "name;opt=val;…" in one `plugin`
+                # query param. Validate faithfully or drop (a plain build would
+                # fail L7 against an obfs server anyway).
+                plugin_raw = next(
+                    (str(v) for k, v in (c.raw_meta or {}).items()
+                     if k.lower() == "plugin" and v),
+                    "",
+                )
+                if plugin_raw:
+                    name, _, opts = plugin_raw.partition(";")
+                    name = name.strip().lower()
+                    if name in ("obfs-local", "simple-obfs"):
+                        base["plugin"] = "obfs-local"
+                        base["plugin_opts"] = opts
+                    elif name == "v2ray-plugin":
+                        base["plugin"] = "v2ray-plugin"
+                        base["plugin_opts"] = opts
+                    else:
+                        return None
+                # Shadowsocks takes no v2ray transport / tls block.
+                return base
 
             elif node.protocol == "hysteria2":
                 if not c.password:
                     return None
                 base.update({"type": "hysteria2", "password": c.password})
-                if c.obfs and c.obfs_password:
-                    base["obfs"] = {"type": c.obfs, "password": c.obfs_password}
+                # Port hopping: links carry mport/ports as "20000-30000" (or a
+                # comma list). sing-box wants server_ports: ["20000:30000"] and
+                # treats it as conflicting with server_port.
+                hop_raw = next(
+                    (str(v) for k, v in (c.raw_meta or {}).items()
+                     if k.lower() in ("mport", "ports", "server_ports") and v),
+                    "",
+                )
+                if hop_raw:
+                    ranges = [
+                        part.strip().replace("-", ":")
+                        for part in hop_raw.replace(",", " ").split()
+                        if part.strip()
+                    ]
+                    if ranges:
+                        base["server_ports"] = ranges
+                        base.pop("server_port", None)
+                # Only "salamander" is a valid obfs.type; an unknown type makes
+                # sing-box reject the config and crash the batch.
+                if c.obfs and c.obfs_password and c.obfs.lower() == "salamander":
+                    base["obfs"] = {"type": "salamander", "password": c.obfs_password}
                 hy2_tls: dict = {"enabled": True, "insecure": True}
                 sni = c.sni or c.host
                 if sni:
@@ -352,7 +397,7 @@ class Inspector:
                 "min_speed":   CONFIG.checking.get("min_speed", 1.0),
                 "speed_as_filter": CONFIG.checking.get("speed_as_filter", False),
                 "speed_concurrency": CONFIG.checking.get("speed_concurrency", 12),
-                "l7_concurrency": CONFIG.checking.get("l7_concurrency", 4),
+                "l7_concurrency": CONFIG.checking.get("l7_concurrency", 6),
                 "connectivity_urls": CONFIG.checking.get(
                     "connectivity_urls", ["http://cp.cloudflare.com/generate_204"]
                 ),

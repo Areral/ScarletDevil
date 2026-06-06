@@ -102,7 +102,9 @@ class Exporter:
                     q["sid"] = c.sid
                 if c.spx is not None:
                     q["spx"] = c.spx
-                if c.flow:
+                # Vision flow is TCP-only; never emit it on a transport URI
+                # (must match what we validated — see engine._node_to_outbound).
+                if c.flow and c.type in ("tcp", "raw"):
                     q["flow"] = c.flow
                 if c.service_name:
                     q["serviceName"] = c.service_name
@@ -162,7 +164,7 @@ class Exporter:
                     q["alpn"] = c.alpn
                 if c.service_name:
                     q["serviceName"] = c.service_name
-                if c.flow:
+                if c.flow and c.type in ("tcp", "raw"):
                     q["flow"] = c.flow
 
                 allow_insecure = any(

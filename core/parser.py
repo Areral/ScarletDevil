@@ -207,6 +207,18 @@ class LinkParser:
             return s
 
     @staticmethod
+    def _b64_decoded_len(s: str) -> int:
+        """Length of the bytes that base64 string `s` decodes to, or -1."""
+        s2 = "".join((s or "").split())
+        pad = "=" * (-len(s2) % 4)
+        for dec in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                return len(dec(s2 + pad))
+            except Exception:
+                continue
+        return -1
+
+    @staticmethod
     def decode_sub_base64(s: str) -> str:
         if not s or not s.strip():
             return s
@@ -308,6 +320,11 @@ class LinkParser:
 
         if conf.flow:
             conf.flow = conf.flow.lower().strip()
+            # xtls-rprx-vision only works over raw TCP+TLS. On any v2ray
+            # transport (ws/grpc/http/…) sing-box 1.12 rejects it, so drop it —
+            # the node can still be checked & shipped over its transport.
+            if conf.type != "tcp":
+                conf.flow = None
 
         if conf.security == "reality":
             if not conf.sid or conf.sid.lower().strip() in ("none", "null", ""):
@@ -550,6 +567,15 @@ class LinkParser:
                 return None
             if method not in SS_VALID_METHODS:
                 return None
+            # 2022-blake3-* require the password to be a base64 PSK of an exact
+            # length (16B for aes-128, 32B for aes-256/chacha20). A wrong key is
+            # a FATAL sing-box startup error that crashes the whole L7 batch, so
+            # drop such nodes here (multi-user form is "serverPSK:userPSK").
+            if method.startswith("2022-"):
+                keylen = 16 if "128" in method else 32
+                last_psk = password.split(":")[-1].strip()
+                if LinkParser._b64_decoded_len(last_psk) != keylen:
+                    return None
 
             q_simple = {}
             if query:

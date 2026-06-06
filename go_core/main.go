@@ -433,7 +433,7 @@ func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 	// speeds the phase up without choking the uplink.
 	l7Conc := globalSettings.L7Concurrency
 	if l7Conc <= 0 {
-		l7Conc = 4
+		l7Conc = 6
 	}
 	if l7Conc > totalBatches {
 		l7Conc = totalBatches
@@ -854,10 +854,13 @@ func testHTTPPing(port int) (int, bool, string) {
 		urls = urls[:2]
 	}
 
-	// HTTP timeout: maxLatency + 10s buffer = 15s total (increased from 6.5s)
+	// HTTP timeout = maxLatency + 2s setup buffer. A larger buffer is pointless:
+	// any node slower than maxLatency is rejected by the `lat > maxLatency` check
+	// below anyway, so a bigger timeout only makes dead nodes hang longer. Two
+	// URLs are tried sequentially, so a dead node costs at most ~2×this.
 	client := getSocksClient(
 		port,
-		time.Duration(maxLatency+10000)*time.Millisecond,
+		time.Duration(maxLatency+2000)*time.Millisecond,
 		false,
 	)
 
