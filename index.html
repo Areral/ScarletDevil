@@ -55,6 +55,13 @@
     --trans: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
     --trans-fast: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 
+    /* --- Unified motion system ("Алый ритм") --- */
+    --ease-scarlet: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-fast: 0.2s;
+    --motion-base: 0.4s;
+    --motion-slow: 0.8s;
+    --stagger-step: 60ms;
+
     /* Theme foundation — override via data-theme */
     --theme-glow-primary: var(--touhou-red-glow);
     --theme-glow-secondary: var(--touhou-purple-glow);
@@ -1574,6 +1581,72 @@ section:last-of-type { border-bottom: none; }
 .wizard-nav { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
 .wizard-nav .btn-secondary, .wizard-nav .btn-primary { width: auto; flex: 1 1 auto; max-width: none; }
 
+/* One global switch: visitors who ask for less motion get final states only. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+    .hero-sparkline, .scan-sweep { display: none !important; }
+}
+
+/* --- Hero: trend chips, sparkline, scan-sweep --- */
+.trend-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 700;
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    vertical-align: middle;
+    letter-spacing: 0.02em;
+}
+.trend-chip.trend-up   { color: var(--cyber-green-glow); background: rgba(16, 185, 129, 0.12); }
+.trend-chip.trend-down { color: var(--touhou-red-glow);  background: rgba(225, 29, 72, 0.12); }
+
+.hero-sparkline {
+    display: block;
+    width: 100%;
+    height: 28px;
+    margin: 6px 0 2px;
+    opacity: 0.9;
+}
+
+.dashboard { position: relative; overflow: hidden; }
+.scan-sweep {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(120deg, transparent 0%,
+        rgba(225, 29, 72, 0.07) 48%, rgba(255, 45, 85, 0.12) 50%,
+        rgba(225, 29, 72, 0.07) 52%, transparent 100%);
+    background-size: 220% 100%;
+    background-position: 200% 0;
+    animation: scan-sweep-move 7s var(--ease-scarlet) infinite;
+}
+@keyframes scan-sweep-move {
+    0%   { background-position: 200% 0; }
+    60%  { background-position: -60% 0; }
+    100% { background-position: -60% 0; }
+}
+#sys-telemetry { transition: opacity var(--motion-fast) var(--ease-scarlet); }
+
+/* Quiet Touhou spell-card captions — present if you look, ignorable if not. */
+.lore-caption {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--touhou-sakura);
+    opacity: 0.33;
+    margin-top: 4px;
+    font-weight: 400;
+    user-select: none;
+}
+
     </style>
 </head>
 <body class="fx-extreme">
@@ -1684,6 +1757,7 @@ section:last-of-type { border-bottom: none; }
             <div class="hero reveal active">
                 <div class="status-badge"><div class="dot"></div> Scarlet Mist Barrier: Active</div>
                 <h1>Scarlet Devil <span>Network</span></h1>
+                <span class="lore-caption">紅魔郷 ~ Embodiment of Scarlet Network</span>
                 <p>
                     Элитная система обхода сетевых барьеров (Scarlet Devil Protocol). 
                     Мы собираем, тестируем и верифицируем лучшие конфигурации связи, 
@@ -1706,18 +1780,28 @@ section:last-of-type { border-bottom: none; }
 
             <div class="grid-layout reveal">
                 <div class="dashboard">
+                    <div class="scan-sweep" aria-hidden="true"></div>
                     <div class="stat-panel">
                         <div class="stat-title"><i class="fa-solid fa-gauge-high"></i> Max Speed</div>
-                        <div class="stat-value text-touhou"><span id="hero-max-speed">—</span><span>Mbps</span></div>
+                        <div class="stat-value text-touhou">
+                            <span id="hero-max-speed">—</span><span>Mbps</span>
+                            <span class="trend-chip" id="trend-speed" data-trend="—"></span>
+                        </div>
                     </div>
                     <div class="stat-panel">
                         <div class="stat-title"><i class="fa-solid fa-server"></i> Active Nodes</div>
-                        <div class="stat-value"><span id="hero-total-nodes">—</span><span>UP</span></div>
+                        <div class="stat-value">
+                            <span id="hero-total-nodes">—</span><span>UP</span>
+                            <span class="trend-chip" id="trend-nodes" data-trend="—"></span>
+                        </div>
                     </div>
-                    
+
+                    <svg class="hero-sparkline" id="hero-sparkline" data-history='—'
+                         preserveAspectRatio="none" aria-hidden="true"></svg>
+
                     <div class="sys-log">
                         <div class="line">> last_sync: <span class="sys-log-time" data-utc="—">— MSK</span></div>
-                        <div class="line">> protocols: <span>VLESS, VMESS, TROJAN, SS, HY2</span></div>
+                        <div class="line">> telemetry: <span class="magic" id="sys-telemetry">…</span></div>
                         <div class="line">> obfuscation: <span class="magic">REALITY_ACTIVE</span></div>
                     </div>
                 </div>
@@ -1878,6 +1962,7 @@ section:last-of-type { border-bottom: none; }
         <section id="stats" class="content-section reveal">
             <div class="glass-card">
                 <h2><i class="fa-solid fa-chart-pie" style="color: var(--touhou-sakura);"></i> Статистика сети</h2>
+                <span class="lore-caption">幻想結界 ~ Phantasm Telemetry</span>
                 <div class="text-block">
                     <p>Актуальная статистика собранных и проверенных узлов. Данные обновляются каждые 4–6 часов вместе с подписками.</p>
                 </div>
@@ -3577,6 +3662,80 @@ const PLATFORM_META = {
 let currentPlatform = 'windows';
 let currentAppId = PLATFORMS['windows'][0];
 
+// --- UNIFIED MOTION HELPERS ("Алый ритм") ---
+var PREFERS_REDUCED = (function () {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (e) { return false; }
+})();
+
+// Eased count-up from 0 to `target`. Instant under reduced-motion.
+function animateCount(el, target, opts) {
+    opts = opts || {};
+    var decimals = opts.decimals || 0;
+    var dur = opts.duration || 800;
+    var suffix = opts.suffix || '';
+    var fmt = function (v) { return v.toFixed(decimals) + suffix; };
+    if (PREFERS_REDUCED || !target || target <= 0) {
+        el.textContent = fmt(target || 0);
+        return;
+    }
+    var start = null;
+    function frame(ts) {
+        if (start === null) start = ts;
+        var p = Math.min((ts - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);   // easeOutCubic — matches --ease-scarlet
+        el.textContent = fmt(target * eased);
+        if (p < 1) requestAnimationFrame(frame);
+        else el.textContent = fmt(target);
+    }
+    requestAnimationFrame(frame);
+}
+
+// Draw a sparkline into an inline <svg> from a numeric series.
+function drawSparkline(svg, series) {
+    if (!svg || !series || series.length < 2) {
+        if (svg) svg.style.display = 'none';
+        return;
+    }
+    var w = 100, h = 28, pad = 2;
+    var min = Math.min.apply(null, series), max = Math.max.apply(null, series);
+    var span = (max - min) || 1;
+    var step = (w - pad * 2) / (series.length - 1);
+    var pts = series.map(function (v, i) {
+        var x = pad + i * step;
+        var y = h - pad - ((v - min) / span) * (h - pad * 2);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    // Safe innerHTML: `pts` are number.toFixed(1) strings only (values pass
+    // through Math.min/max + arithmetic + toFixed), and the rest is static
+    // markup — no untrusted string reaches the DOM here.
+    svg.innerHTML =
+        '<defs><linearGradient id="spark-grad" x1="0" y1="0" x2="1" y2="0">' +
+        '<stop offset="0%" stop-color="var(--touhou-crimson)"/>' +
+        '<stop offset="100%" stop-color="var(--touhou-red-glow)"/></linearGradient></defs>' +
+        '<polyline points="' + pts.join(' ') + '" fill="none" ' +
+        'stroke="url(#spark-grad)" stroke-width="1.5" ' +
+        'stroke-linecap="round" stroke-linejoin="round"/>';
+    var line = svg.querySelector('polyline');
+    if (line && !PREFERS_REDUCED) {
+        var len = line.getTotalLength ? line.getTotalLength() : 200;
+        line.style.strokeDasharray = len;
+        line.style.strokeDashoffset = len;
+        line.style.transition = 'stroke-dashoffset var(--motion-slow) var(--ease-scarlet)';
+        requestAnimationFrame(function () { line.style.strokeDashoffset = '0'; });
+    }
+}
+
+// Read the embedded node-stats blob once (null if absent/unsubstituted).
+function readNodeStats() {
+    var el = document.getElementById('stats-data');
+    if (!el) return null;
+    var raw = el.getAttribute('data-node-stats');
+    if (!raw || raw.indexOf('{{') !== -1) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
 // --- ROBUSTNESS: never leak raw template tokens to a visitor ---
 // Server-side substitution (merge.py::build_html) normally fills every token.
 // If a stale or un-substituted index.html ever ships, this fills the hero stats
@@ -3609,8 +3768,66 @@ function healPlaceholders() {
     } catch (e) { /* TreeWalker unavailable — non-critical */ }
 }
 
+// --- HERO: live command center ---
+function initHero() {
+    var node = readNodeStats();
+
+    var hs = document.getElementById('hero-max-speed');
+    var hn = document.getElementById('hero-total-nodes');
+    if (hs && node && typeof node.max_speed === 'number') animateCount(hs, node.max_speed);
+    if (hn && node && typeof node.total === 'number') animateCount(hn, node.total);
+
+    // Trend chips: show ▲/▼ +N% from the data-trend attr; hide when empty.
+    document.querySelectorAll('.trend-chip').forEach(function (chip) {
+        var v = chip.getAttribute('data-trend');
+        var n = parseFloat(v);
+        if (!v || v.indexOf('{{') !== -1 || isNaN(n) || n === 0) { chip.style.display = 'none'; return; }
+        var up = n > 0;
+        chip.classList.add(up ? 'trend-up' : 'trend-down');
+        chip.textContent = (up ? '▲ ' : '▼ ') + (up ? '+' : '') + n.toFixed(1) + '%';
+    });
+
+    // Sparkline from embedded history.
+    var svg = document.getElementById('hero-sparkline');
+    if (svg) {
+        var raw = svg.getAttribute('data-history'), series = null;
+        if (raw && raw.indexOf('{{') === -1) {
+            try {
+                var arr = JSON.parse(raw);
+                series = arr.map(function (p) { return p.total; });
+            } catch (e) { series = null; }
+        }
+        drawSparkline(svg, series);
+    }
+
+    // Quiet, truthful telemetry rotator in the sys-log.
+    var tEl = document.getElementById('sys-telemetry');
+    if (tEl && node) {
+        var lines = [];
+        if (typeof node.median_speed === 'number') lines.push('median ' + node.median_speed + ' Mbps');
+        if (typeof node.total === 'number') lines.push('verified ' + node.total + ' nodes');
+        if (node.countries && node.countries.length) lines.push('top: ' + (node.countries[0].code || '??'));
+        if (typeof node.bs === 'number') lines.push('reality ' + node.bs + ' nodes');
+        if (!lines.length) { tEl.textContent = 'online'; }
+        else {
+            var i = 0;
+            tEl.textContent = lines[0];
+            if (!PREFERS_REDUCED && lines.length > 1) {
+                setInterval(function () {
+                    i = (i + 1) % lines.length;
+                    tEl.style.opacity = '0';
+                    setTimeout(function () { tEl.textContent = lines[i]; tEl.style.opacity = '1'; }, 250);
+                }, 4000);
+            }
+        }
+    } else if (tEl) {
+        tEl.textContent = 'online';
+    }
+}
+
 function init() {
     healPlaceholders();
+    initHero();
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes("android") && ua.includes("tv")) currentPlatform = 'androidtv';
     else if (ua.includes("android")) currentPlatform = 'android';
@@ -4480,13 +4697,23 @@ function initStats() {
 
     var maxCount = Math.max(counts.vless, counts.vmess, counts.trojan, counts.ss, counts.hy2, 1);
 
-    // Render protocol bars
-    function setBar(id, val) {
+    // Render protocol bars — staggered growth on the shared motion rhythm.
+    var barIndex = 0;
+    function growBar(id, val, scale) {
         var bar = document.getElementById(id);
         var valEl = document.getElementById('val-' + id.split('-')[1]);
-        if (bar) bar.style.width = (val / maxCount * 100) + '%';
-        if (valEl) valEl.textContent = val;
+        var delay = (barIndex++) * 60;          // --stagger-step
+        if (bar) {
+            if (PREFERS_REDUCED) {
+                bar.style.width = (val / scale * 100) + '%';
+            } else {
+                bar.style.transition = 'width var(--motion-base) var(--ease-scarlet) ' + delay + 'ms';
+                requestAnimationFrame(function () { bar.style.width = (val / scale * 100) + '%'; });
+            }
+        }
+        if (valEl) animateCount(valEl, val);
     }
+    function setBar(id, val) { growBar(id, val, maxCount); }
     setBar('bar-vless', counts.vless);
     setBar('bar-vmess', counts.vmess);
     setBar('bar-trojan', counts.trojan);
@@ -4495,12 +4722,7 @@ function initStats() {
 
     // Render class bars
     var maxClass = Math.max(counts.bs, counts.chs, 1);
-    function setClassBar(id, val) {
-        var bar = document.getElementById(id);
-        var valEl = document.getElementById('val-' + id.split('-')[1]);
-        if (bar) bar.style.width = (val / maxClass * 100) + '%';
-        if (valEl) valEl.textContent = val;
-    }
+    function setClassBar(id, val) { growBar(id, val, maxClass); }
     setClassBar('bar-bs', counts.bs);
     setClassBar('bar-chs', counts.chs);
 
@@ -4552,12 +4774,19 @@ function initStats() {
     var sumP90 = document.getElementById('sum-p90-speed');
     var sumTotal = document.getElementById('sum-total');
     var sumBS = document.getElementById('sum-bs');
-    if (sumMax) sumMax.textContent = maxSpeed + ' Mbps';
-    if (sumAvg) sumAvg.textContent = avgSpeed + ' Mbps';
-    if (sumMed) sumMed.textContent = medianSpeed + ' Mbps';
-    if (sumP90) sumP90.textContent = speedP90 + ' Mbps';
-    if (sumTotal) sumTotal.textContent = totalNodes;
-    if (sumBS) sumBS.textContent = counts.bs;
+    // Count-up summaries, preserving units and the "—" no-data fallback.
+    function setSummary(el, val, decimals, suffix) {
+        if (!el) return;
+        var n = parseFloat(val);
+        if (isNaN(n)) { el.textContent = val; return; }   // "—"
+        animateCount(el, n, { decimals: decimals, suffix: suffix });
+    }
+    setSummary(sumMax, maxSpeed, 0, ' Mbps');
+    setSummary(sumAvg, avgSpeed, 1, ' Mbps');
+    setSummary(sumMed, medianSpeed, 1, ' Mbps');
+    setSummary(sumP90, speedP90, 1, ' Mbps');
+    setSummary(sumTotal, totalNodes, 0, '');
+    if (sumBS) animateCount(sumBS, counts.bs);
 }
 
 init();
