@@ -278,13 +278,23 @@ class TestSsValid:
         assert c.password == "password"
 
     def test_2022_blake3(self):
-        creds = base64.b64encode(b"2022-blake3-aes-256-gcm:strongpassword").decode().rstrip("=")
+        # 2022-blake3-aes-256-gcm requires a base64 32-byte PSK; a wrong-length
+        # key is a FATAL sing-box startup error that crashes the whole L7 batch,
+        # so the parser only accepts a correctly-sized key.
+        key = base64.b64encode(b"\x11" * 32).decode()
+        creds = base64.b64encode(f"2022-blake3-aes-256-gcm:{key}".encode()).decode().rstrip("=")
         uri = f"ss://{creds}@example.com:443"
         node = LinkParser.parse_ss(uri)
         assert node is not None
         assert node.protocol == "ss"
         assert node.config.method == "2022-blake3-aes-256-gcm"
-        assert node.config.password == "strongpassword"
+        assert node.config.password == key
+
+    def test_2022_blake3_bad_key_rejected(self):
+        # Non-base64 / wrong-length PSK must be dropped (would crash sing-box).
+        creds = base64.b64encode(b"2022-blake3-aes-256-gcm:strongpassword").decode().rstrip("=")
+        uri = f"ss://{creds}@example.com:443"
+        assert LinkParser.parse_ss(uri) is None
 
 
 class TestSsGarbage:
