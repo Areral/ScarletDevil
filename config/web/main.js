@@ -1060,8 +1060,66 @@ function healPlaceholders() {
     } catch (e) { /* TreeWalker unavailable — non-critical */ }
 }
 
+// --- HERO: live command center ---
+function initHero() {
+    var node = readNodeStats();
+
+    var hs = document.getElementById('hero-max-speed');
+    var hn = document.getElementById('hero-total-nodes');
+    if (hs && node && typeof node.max_speed === 'number') animateCount(hs, node.max_speed);
+    if (hn && node && typeof node.total === 'number') animateCount(hn, node.total);
+
+    // Trend chips: show ▲/▼ +N% from the data-trend attr; hide when empty.
+    document.querySelectorAll('.trend-chip').forEach(function (chip) {
+        var v = chip.getAttribute('data-trend');
+        var n = parseFloat(v);
+        if (!v || v.indexOf('{{') !== -1 || isNaN(n) || n === 0) { chip.style.display = 'none'; return; }
+        var up = n > 0;
+        chip.classList.add(up ? 'trend-up' : 'trend-down');
+        chip.textContent = (up ? '▲ ' : '▼ ') + (up ? '+' : '') + n.toFixed(1) + '%';
+    });
+
+    // Sparkline from embedded history.
+    var svg = document.getElementById('hero-sparkline');
+    if (svg) {
+        var raw = svg.getAttribute('data-history'), series = null;
+        if (raw && raw.indexOf('{{') === -1) {
+            try {
+                var arr = JSON.parse(raw);
+                series = arr.map(function (p) { return p.total; });
+            } catch (e) { series = null; }
+        }
+        drawSparkline(svg, series);
+    }
+
+    // Quiet, truthful telemetry rotator in the sys-log.
+    var tEl = document.getElementById('sys-telemetry');
+    if (tEl && node) {
+        var lines = [];
+        if (typeof node.median_speed === 'number') lines.push('median ' + node.median_speed + ' Mbps');
+        if (typeof node.total === 'number') lines.push('verified ' + node.total + ' nodes');
+        if (node.countries && node.countries.length) lines.push('top: ' + (node.countries[0].code || '??'));
+        if (typeof node.bs === 'number') lines.push('reality ' + node.bs + ' nodes');
+        if (!lines.length) { tEl.textContent = 'online'; }
+        else {
+            var i = 0;
+            tEl.textContent = lines[0];
+            if (!PREFERS_REDUCED && lines.length > 1) {
+                setInterval(function () {
+                    i = (i + 1) % lines.length;
+                    tEl.style.opacity = '0';
+                    setTimeout(function () { tEl.textContent = lines[i]; tEl.style.opacity = '1'; }, 250);
+                }, 4000);
+            }
+        }
+    } else if (tEl) {
+        tEl.textContent = 'online';
+    }
+}
+
 function init() {
     healPlaceholders();
+    initHero();
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes("android") && ua.includes("tv")) currentPlatform = 'androidtv';
     else if (ua.includes("android")) currentPlatform = 'android';

@@ -1568,3 +1568,44 @@ section:last-of-type { border-bottom: none; }
     }
     .hero-sparkline, .scan-sweep { display: none !important; }
 }
+
+/* --- Hero: trend chips, sparkline, scan-sweep --- */
+.trend-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 700;
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    vertical-align: middle;
+    letter-spacing: 0.02em;
+}
+.trend-chip.trend-up   { color: var(--cyber-green-glow); background: rgba(16, 185, 129, 0.12); }
+.trend-chip.trend-down { color: var(--touhou-red-glow);  background: rgba(225, 29, 72, 0.12); }
+
+.hero-sparkline {
+    display: block;
+    width: 100%;
+    height: 28px;
+    margin: 6px 0 2px;
+    opacity: 0.9;
+}
+
+.dashboard { position: relative; overflow: hidden; }
+.scan-sweep {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(120deg, transparent 0%,
+        rgba(225, 29, 72, 0.07) 48%, rgba(255, 45, 85, 0.12) 50%,
+        rgba(225, 29, 72, 0.07) 52%, transparent 100%);
+    background-size: 220% 100%;
+    background-position: 200% 0;
+    animation: scan-sweep-move 7s var(--ease-scarlet) infinite;
+}
+@keyframes scan-sweep-move {
+    0%   { background-position: 200% 0; }
+    60%  { background-position: -60% 0; }
+    100% { background-position: -60% 0; }
+}
+#sys-telemetry { transition: opacity var(--motion-fast) var(--ease-scarlet); }
