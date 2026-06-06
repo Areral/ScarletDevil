@@ -1,5 +1,6 @@
 # --- START OF FILE merge.py ---
 import os
+import re
 import json
 import glob
 import base64
@@ -129,7 +130,8 @@ async def send_telegram_report(stats: dict) -> None:
             logger.error(f"  Ошибка отправки в Telegram: {exc}")
 
 
-def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
+def build_html(total_alive: int, top_speed: float, stats: dict,
+               history: list | None = None) -> None:
     template_path = "config/web/template.html"
     if not os.path.exists(template_path):
         logger.warning(f"  Шаблон не найден: {template_path} — пропуск.")
@@ -173,6 +175,19 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
         }
         node_stats_json = json.dumps(node_stats, ensure_ascii=False)
 
+        trends = compute_trends(history or [])
+
+        def _trend_str(pct):
+            return f"{pct:+.1f}" if pct is not None else ""
+
+        trend_nodes = _trend_str(trends["nodes_pct"])
+        trend_speed = _trend_str(trends["speed_pct"])
+        history_json = json.dumps(
+            [{"total": t, "max_speed": s}
+             for t, s in zip(trends["series_total"], trends["series_speed"])],
+            ensure_ascii=False,
+        )
+
         html_out = (
             tpl.replace("{{INJECT_CSS}}", css)
                .replace("{{INJECT_JS}}", js)
@@ -190,9 +205,21 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
                .replace("{{TROJAN_COUNT}}", str(stats.get("trojan_count", 0)))
                .replace("{{SS_COUNT}}", str(stats.get("ss_count", 0)))
                .replace("{{HY2_COUNT}}", str(stats.get("hy2_count", 0)))
+               .replace("{{TREND_NODES}}", trend_nodes)
+               .replace("{{TREND_SPEED}}", trend_speed)
+               .replace("{{HISTORY_JSON}}", history_json)
                .replace("{{COUNTRY_STATS_JSON}}", country_stats_json)
                .replace("{{NODE_STATS_JSON}}", node_stats_json)
         )
+
+        # Safety net: a placeholder in the template with no matching .replace()
+        # above must never reach the published page (the visible "{{MAX_SPEED}}"
+        # bug). Rewrite any survivor to an em-dash and shout about it in the log.
+        leftover = sorted(set(re.findall(r"\{\{[A-Z0-9_]+\}\}", html_out)))
+        if leftover:
+            logger.warning(f"  Незаполненные плейсхолдеры (заменены на «—»): {leftover}")
+            html_out = re.sub(r"\{\{[A-Z0-9_]+\}\}", "—", html_out)
+
         with open("index.html", "w", encoding="utf-8") as f:
             f.write(html_out)
 
@@ -320,6 +347,88 @@ def update_pool(alive_uris: set, path: str = POOL_PATH) -> dict:
         f"(evicted={evicted}, new={added})"
     )
     return {"size": len(updated), "evicted": evicted, "added": added}
+
+
+HISTORY_PATH = "data/history.json"
+HISTORY_MAX = 90
+TREND_SERIES_LEN = 30
+
+
+def load_history(path: str = HISTORY_PATH) -> list:
+    """Load the rolling network-stats history (chronological, oldest first)."""
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            hist = json.load(f)
+        return hist if isinstance(hist, list) else []
+    except Exception:
+        return []
+
+
+def save_history(hist: list, path: str = HISTORY_PATH) -> None:
+    """Persist the rolling history to disk."""
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(hist, f, ensure_ascii=False)
+
+
+def _snapshot(stats: dict) -> dict:
+    """Reduce the aggregate stats dict to one compact, serialisable point."""
+    return {
+        "t":         datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "total":     int(stats.get("unique_alive", 0)),
+        "max_speed": int(stats.get("top_speed", 0.0)),
+        "avg":       round(stats.get("avg_speed", 0.0), 1),
+        "median":    round(stats.get("median_speed", 0.0), 1),
+        "p90":       round(stats.get("speed_percentile_90", 0.0), 1),
+        "vless":     int(stats.get("vless_count", 0)),
+        "vmess":     int(stats.get("vmess_count", 0)),
+        "trojan":    int(stats.get("trojan_count", 0)),
+        "ss":        int(stats.get("ss_count", 0)),
+        "hy2":       int(stats.get("hy2_count", 0)),
+        "bs":        int(stats.get("bs_count", 0)),
+        "chs":       int(stats.get("chs_count", 0)),
+        "countries": len(stats.get("country_stats", [])),
+    }
+
+
+def update_history(stats: dict, path: str = HISTORY_PATH) -> list:
+    """Append one snapshot of this run and rotate to the last HISTORY_MAX."""
+    hist = load_history(path)
+    hist.append(_snapshot(stats))
+    if len(hist) > HISTORY_MAX:
+        hist = hist[-HISTORY_MAX:]
+    save_history(hist, path)
+    logger.info(f"  History: {len(hist)} snapshots (cap {HISTORY_MAX})")
+    return hist
+
+
+def _pct(prev: float, cur: float):
+    """Signed percent change prev→cur, or None when prev is non-positive."""
+    if prev is None or prev <= 0:
+        return None
+    return (cur - prev) / prev * 100.0
+
+
+def compute_trends(history: list) -> dict:
+    """Derive sparkline series + signed percent deltas from history.
+
+    Returns nodes_pct/speed_pct (None when <2 points or prev<=0) and the
+    last TREND_SERIES_LEN totals/speeds for the hero sparkline.
+    """
+    totals = [int(h.get("total", 0)) for h in history]
+    speeds = [int(h.get("max_speed", 0)) for h in history]
+    nodes_pct = speed_pct = None
+    if len(history) >= 2:
+        nodes_pct = _pct(totals[-2], totals[-1])
+        speed_pct = _pct(speeds[-2], speeds[-1])
+    return {
+        "nodes_pct":    nodes_pct,
+        "speed_pct":    speed_pct,
+        "series_total": totals[-TREND_SERIES_LEN:],
+        "series_speed": speeds[-TREND_SERIES_LEN:],
+    }
 
 
 def main() -> None:
@@ -522,7 +631,8 @@ def main() -> None:
     GHA.endgroup()
 
     GHA.phase("④", "BUILD", "Compiling dashboard (index.html)")
-    build_html(stats["unique_alive"], stats["top_speed"], stats)
+    history = update_history(stats)
+    build_html(stats["unique_alive"], stats["top_speed"], stats, history)
     GHA.endgroup()
 
     GHA.phase("⑤", "NOTIFY", "Sending Telegram report")

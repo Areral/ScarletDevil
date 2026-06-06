@@ -955,7 +955,172 @@ const PLATFORM_META = {
 let currentPlatform = 'windows';
 let currentAppId = PLATFORMS['windows'][0];
 
+// --- UNIFIED MOTION HELPERS ("Алый ритм") ---
+var PREFERS_REDUCED = (function () {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (e) { return false; }
+})();
+
+// Eased count-up from 0 to `target`. Instant under reduced-motion.
+function animateCount(el, target, opts) {
+    opts = opts || {};
+    var decimals = opts.decimals || 0;
+    var dur = opts.duration || 800;
+    var suffix = opts.suffix || '';
+    var fmt = function (v) { return v.toFixed(decimals) + suffix; };
+    if (PREFERS_REDUCED || !target || target <= 0) {
+        el.textContent = fmt(target || 0);
+        return;
+    }
+    var start = null;
+    function frame(ts) {
+        if (start === null) start = ts;
+        var p = Math.min((ts - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);   // easeOutCubic — matches --ease-scarlet
+        el.textContent = fmt(target * eased);
+        if (p < 1) requestAnimationFrame(frame);
+        else el.textContent = fmt(target);
+    }
+    requestAnimationFrame(frame);
+}
+
+// Draw a sparkline into an inline <svg> from a numeric series.
+function drawSparkline(svg, series) {
+    if (!svg || !series || series.length < 2) {
+        if (svg) svg.style.display = 'none';
+        return;
+    }
+    var w = 100, h = 28, pad = 2;
+    var min = Math.min.apply(null, series), max = Math.max.apply(null, series);
+    var span = (max - min) || 1;
+    var step = (w - pad * 2) / (series.length - 1);
+    var pts = series.map(function (v, i) {
+        var x = pad + i * step;
+        var y = h - pad - ((v - min) / span) * (h - pad * 2);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    // Safe innerHTML: `pts` are number.toFixed(1) strings only (values pass
+    // through Math.min/max + arithmetic + toFixed), and the rest is static
+    // markup — no untrusted string reaches the DOM here.
+    svg.innerHTML =
+        '<defs><linearGradient id="spark-grad" x1="0" y1="0" x2="1" y2="0">' +
+        '<stop offset="0%" stop-color="var(--touhou-crimson)"/>' +
+        '<stop offset="100%" stop-color="var(--touhou-red-glow)"/></linearGradient></defs>' +
+        '<polyline points="' + pts.join(' ') + '" fill="none" ' +
+        'stroke="url(#spark-grad)" stroke-width="1.5" ' +
+        'stroke-linecap="round" stroke-linejoin="round"/>';
+    var line = svg.querySelector('polyline');
+    if (line && !PREFERS_REDUCED) {
+        var len = line.getTotalLength ? line.getTotalLength() : 200;
+        line.style.strokeDasharray = len;
+        line.style.strokeDashoffset = len;
+        line.style.transition = 'stroke-dashoffset var(--motion-slow) var(--ease-scarlet)';
+        requestAnimationFrame(function () { line.style.strokeDashoffset = '0'; });
+    }
+}
+
+// Read the embedded node-stats blob once (null if absent/unsubstituted).
+function readNodeStats() {
+    var el = document.getElementById('stats-data');
+    if (!el) return null;
+    var raw = el.getAttribute('data-node-stats');
+    if (!raw || raw.indexOf('{{') !== -1) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+// --- ROBUSTNESS: never leak raw template tokens to a visitor ---
+// Server-side substitution (merge.py::build_html) normally fills every token.
+// If a stale or un-substituted index.html ever ships, this fills the hero stats
+// from the embedded node-stats blob and rewrites any remaining {{...}} tokens in
+// visible text to an em-dash, so the page degrades cleanly instead of leaking
+// template syntax to the user.
+function healPlaceholders() {
+    var statsData = document.getElementById('stats-data');
+    var node = null;
+    if (statsData) {
+        var nj = statsData.getAttribute('data-node-stats');
+        if (nj && nj.indexOf('{{') === -1) {
+            try { node = JSON.parse(nj); } catch (e) { node = null; }
+        }
+    }
+    if (node) {
+        var hs = document.getElementById('hero-max-speed');
+        var hn = document.getElementById('hero-total-nodes');
+        if (hs && typeof node.max_speed === 'number') hs.textContent = node.max_speed;
+        if (hn && typeof node.total === 'number') hn.textContent = node.total;
+    }
+    try {
+        var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+        var n;
+        while ((n = walker.nextNode())) {
+            if (n.nodeValue.indexOf('{{') !== -1) {
+                n.nodeValue = n.nodeValue.replace(/\{\{[A-Z0-9_]+\}\}/g, '—');
+            }
+        }
+    } catch (e) { /* TreeWalker unavailable — non-critical */ }
+}
+
+// --- HERO: live command center ---
+function initHero() {
+    var node = readNodeStats();
+
+    var hs = document.getElementById('hero-max-speed');
+    var hn = document.getElementById('hero-total-nodes');
+    if (hs && node && typeof node.max_speed === 'number') animateCount(hs, node.max_speed);
+    if (hn && node && typeof node.total === 'number') animateCount(hn, node.total);
+
+    // Trend chips: show ▲/▼ +N% from the data-trend attr; hide when empty.
+    document.querySelectorAll('.trend-chip').forEach(function (chip) {
+        var v = chip.getAttribute('data-trend');
+        var n = parseFloat(v);
+        if (!v || v.indexOf('{{') !== -1 || isNaN(n) || n === 0) { chip.style.display = 'none'; return; }
+        var up = n > 0;
+        chip.classList.add(up ? 'trend-up' : 'trend-down');
+        chip.textContent = (up ? '▲ ' : '▼ ') + (up ? '+' : '') + n.toFixed(1) + '%';
+    });
+
+    // Sparkline from embedded history.
+    var svg = document.getElementById('hero-sparkline');
+    if (svg) {
+        var raw = svg.getAttribute('data-history'), series = null;
+        if (raw && raw.indexOf('{{') === -1) {
+            try {
+                var arr = JSON.parse(raw);
+                series = arr.map(function (p) { return p.total; });
+            } catch (e) { series = null; }
+        }
+        drawSparkline(svg, series);
+    }
+
+    // Quiet, truthful telemetry rotator in the sys-log.
+    var tEl = document.getElementById('sys-telemetry');
+    if (tEl && node) {
+        var lines = [];
+        if (typeof node.median_speed === 'number') lines.push('median ' + node.median_speed + ' Mbps');
+        if (typeof node.total === 'number') lines.push('verified ' + node.total + ' nodes');
+        if (node.countries && node.countries.length) lines.push('top: ' + (node.countries[0].code || '??'));
+        if (typeof node.bs === 'number') lines.push('reality ' + node.bs + ' nodes');
+        if (!lines.length) { tEl.textContent = 'online'; }
+        else {
+            var i = 0;
+            tEl.textContent = lines[0];
+            if (!PREFERS_REDUCED && lines.length > 1) {
+                setInterval(function () {
+                    i = (i + 1) % lines.length;
+                    tEl.style.opacity = '0';
+                    setTimeout(function () { tEl.textContent = lines[i]; tEl.style.opacity = '1'; }, 250);
+                }, 4000);
+            }
+        }
+    } else if (tEl) {
+        tEl.textContent = 'online';
+    }
+}
+
 function init() {
+    healPlaceholders();
+    initHero();
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes("android") && ua.includes("tv")) currentPlatform = 'androidtv';
     else if (ua.includes("android")) currentPlatform = 'android';
@@ -1825,13 +1990,23 @@ function initStats() {
 
     var maxCount = Math.max(counts.vless, counts.vmess, counts.trojan, counts.ss, counts.hy2, 1);
 
-    // Render protocol bars
-    function setBar(id, val) {
+    // Render protocol bars — staggered growth on the shared motion rhythm.
+    var barIndex = 0;
+    function growBar(id, val, scale) {
         var bar = document.getElementById(id);
         var valEl = document.getElementById('val-' + id.split('-')[1]);
-        if (bar) bar.style.width = (val / maxCount * 100) + '%';
-        if (valEl) valEl.textContent = val;
+        var delay = (barIndex++) * 60;          // --stagger-step
+        if (bar) {
+            if (PREFERS_REDUCED) {
+                bar.style.width = (val / scale * 100) + '%';
+            } else {
+                bar.style.transition = 'width var(--motion-base) var(--ease-scarlet) ' + delay + 'ms';
+                requestAnimationFrame(function () { bar.style.width = (val / scale * 100) + '%'; });
+            }
+        }
+        if (valEl) animateCount(valEl, val);
     }
+    function setBar(id, val) { growBar(id, val, maxCount); }
     setBar('bar-vless', counts.vless);
     setBar('bar-vmess', counts.vmess);
     setBar('bar-trojan', counts.trojan);
@@ -1840,12 +2015,7 @@ function initStats() {
 
     // Render class bars
     var maxClass = Math.max(counts.bs, counts.chs, 1);
-    function setClassBar(id, val) {
-        var bar = document.getElementById(id);
-        var valEl = document.getElementById('val-' + id.split('-')[1]);
-        if (bar) bar.style.width = (val / maxClass * 100) + '%';
-        if (valEl) valEl.textContent = val;
-    }
+    function setClassBar(id, val) { growBar(id, val, maxClass); }
     setClassBar('bar-bs', counts.bs);
     setClassBar('bar-chs', counts.chs);
 
@@ -1897,12 +2067,19 @@ function initStats() {
     var sumP90 = document.getElementById('sum-p90-speed');
     var sumTotal = document.getElementById('sum-total');
     var sumBS = document.getElementById('sum-bs');
-    if (sumMax) sumMax.textContent = maxSpeed + ' Mbps';
-    if (sumAvg) sumAvg.textContent = avgSpeed + ' Mbps';
-    if (sumMed) sumMed.textContent = medianSpeed + ' Mbps';
-    if (sumP90) sumP90.textContent = speedP90 + ' Mbps';
-    if (sumTotal) sumTotal.textContent = totalNodes;
-    if (sumBS) sumBS.textContent = counts.bs;
+    // Count-up summaries, preserving units and the "—" no-data fallback.
+    function setSummary(el, val, decimals, suffix) {
+        if (!el) return;
+        var n = parseFloat(val);
+        if (isNaN(n)) { el.textContent = val; return; }   // "—"
+        animateCount(el, n, { decimals: decimals, suffix: suffix });
+    }
+    setSummary(sumMax, maxSpeed, 0, ' Mbps');
+    setSummary(sumAvg, avgSpeed, 1, ' Mbps');
+    setSummary(sumMed, medianSpeed, 1, ' Mbps');
+    setSummary(sumP90, speedP90, 1, ' Mbps');
+    setSummary(sumTotal, totalNodes, 0, '');
+    if (sumBS) animateCount(sumBS, counts.bs);
 }
 
 init();

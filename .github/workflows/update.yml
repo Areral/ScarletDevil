@@ -150,7 +150,7 @@ jobs:
           # first run) — which previously crashed the whole merge job.
           PUBLISH_FILES="index.html sub_all.txt sub_bs.txt sub_chs.txt sub_ru.txt \
                   sub_vless.txt sub_vmess.txt sub_trojan.txt sub_ss.txt sub_hy2.txt \
-                  data/source_health.json data/pool.json"
+                  data/source_health.json data/pool.json data/history.json"
           for f in $PUBLISH_FILES; do
             [ -f "$f" ] && git add "$f" || echo "skip (missing): $f"
           done

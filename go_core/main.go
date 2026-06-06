@@ -201,15 +201,15 @@ func writeCombinedStats() {
 	l7StatsMu.Unlock()
 
 	combined := map[string]interface{}{
-		"total":             l4.Total,
-		"survived":          l4.Survived,
-		"dns_error":         l4.DNS_Error,
-		"timeout":           l4.Timeout,
+		"total":              l4.Total,
+		"survived":           l4.Survived,
+		"dns_error":          l4.DNS_Error,
+		"timeout":            l4.Timeout,
 		"connection_refused": l4.ConnectionRefused,
-		"invalid_config":    l4.InvalidConfig,
-		"other":             l4.Other,
-		"retry_attempts":    l4.RetryAttempts,
-		"retry_recovered":   l4.RetryRecovered,
+		"invalid_config":     l4.InvalidConfig,
+		"other":              l4.Other,
+		"retry_attempts":     l4.RetryAttempts,
+		"retry_recovered":    l4.RetryRecovered,
 		"l7": map[string]interface{}{
 			"total":             l7.Total,
 			"survived":          l7.Survived,
@@ -468,6 +468,12 @@ func runL7Phase(nodes []map[string]interface{}) []map[string]interface{} {
 			defer wg.Done()
 			defer func() { <-sem }()
 			if atomic.LoadInt32(&fatalFlag) == 1 {
+				// A sibling batch already hit a fatal (binary-missing) abort.
+				// Count this batch's nodes so they are not silently dropped from
+				// the L7 ledger (Total stays == Survived + Σfailures).
+				l7StatsMu.Lock()
+				l7Stats.SingboxCrash += len(b)
+				l7StatsMu.Unlock()
 				return
 			}
 
@@ -577,10 +583,15 @@ func processSingboxBatch(
 	portToNode := make(map[int]map[string]interface{}, len(batch))
 
 	firstValidPort := -1
+	skipped := 0
 
 	for i, node := range batch {
 		readyOutbound, ok := node["ready_outbound"].(map[string]interface{})
 		if !ok {
+			// Node carries no usable outbound. Count it so the L7 ledger stays
+			// balanced (Total == Survived + Σfailures); previously a mixed batch
+			// silently lost these nodes from every counter.
+			skipped++
 			continue
 		}
 		tag := fmt.Sprintf("proxy-%d", i)
@@ -606,11 +617,15 @@ func processSingboxBatch(
 		}
 	}
 
-	if firstValidPort == -1 || len(portToNode) == 0 {
-		// All nodes in this batch have no valid outbound config
+	if skipped > 0 {
 		l7StatsMu.Lock()
-		l7Stats.ProtocolMismatch += len(batch)
+		l7Stats.ProtocolMismatch += skipped
 		l7StatsMu.Unlock()
+	}
+
+	if firstValidPort == -1 || len(portToNode) == 0 {
+		// Every node in this (sub-)batch lacked a valid outbound — already
+		// counted above via `skipped`.
 		return nil, false, false
 	}
 
@@ -967,6 +982,13 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool, st
 		return 0, false, "http_error"
 	}
 
+	// Reset the clock AFTER the response headers arrive so throughput is measured
+	// over body transfer only. Including the SOCKS dial + remote TCP + TLS
+	// handshake + TTFB (which all scale with the node's latency, already captured
+	// by testHTTPPing) systematically deflated the figure — worst for fast,
+	// high-latency nodes — and under speed_as_filter dropped genuinely good nodes.
+	tStart = time.Now()
+
 	buf := make([]byte, readBufSize)
 	total := 0
 
@@ -984,7 +1006,17 @@ func testHTTPSpeed(port int, verifySSL bool, isChampion bool) (float64, bool, st
 		}
 	}
 
-	if total < 256*1024 {
+	// Minimum bytes needed to trust the measurement. The champion round downloads
+	// 10 MB to refine the top-N; if it delivers under 1 MB the sample is too
+	// truncated (typically a mid-transfer stall) to be representative, so report
+	// "too_slow" and let the caller keep the earlier L7 figure instead of
+	// overwriting a fast node with a near-zero stalled-download value. 1 MB only
+	// rejects nodes under ~0.3 Mbps, whose retained L7 number is fine anyway.
+	minValid := 256 * 1024
+	if isChampion {
+		minValid = 1024 * 1024
+	}
+	if total < minValid {
 		return 0, false, "too_slow"
 	}
 

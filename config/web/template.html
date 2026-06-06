@@ -132,6 +132,7 @@
             <div class="hero reveal active">
                 <div class="status-badge"><div class="dot"></div> Scarlet Mist Barrier: Active</div>
                 <h1>Scarlet Devil <span>Network</span></h1>
+                <span class="lore-caption">紅魔郷 ~ Embodiment of Scarlet Network</span>
                 <p>
                     Элитная система обхода сетевых барьеров (Scarlet Devil Protocol). 
                     Мы собираем, тестируем и верифицируем лучшие конфигурации связи, 
@@ -154,18 +155,28 @@
 
             <div class="grid-layout reveal">
                 <div class="dashboard">
+                    <div class="scan-sweep" aria-hidden="true"></div>
                     <div class="stat-panel">
                         <div class="stat-title"><i class="fa-solid fa-gauge-high"></i> Max Speed</div>
-                        <div class="stat-value text-touhou">{{MAX_SPEED}}<span>Mbps</span></div>
+                        <div class="stat-value text-touhou">
+                            <span id="hero-max-speed">{{MAX_SPEED}}</span><span>Mbps</span>
+                            <span class="trend-chip" id="trend-speed" data-trend="{{TREND_SPEED}}"></span>
+                        </div>
                     </div>
                     <div class="stat-panel">
                         <div class="stat-title"><i class="fa-solid fa-server"></i> Active Nodes</div>
-                        <div class="stat-value">{{PROXY_COUNT}}<span>UP</span></div>
+                        <div class="stat-value">
+                            <span id="hero-total-nodes">{{PROXY_COUNT}}</span><span>UP</span>
+                            <span class="trend-chip" id="trend-nodes" data-trend="{{TREND_NODES}}"></span>
+                        </div>
                     </div>
-                    
+
+                    <svg class="hero-sparkline" id="hero-sparkline" data-history='{{HISTORY_JSON}}'
+                         preserveAspectRatio="none" aria-hidden="true"></svg>
+
                     <div class="sys-log">
                         <div class="line">> last_sync: <span class="sys-log-time" data-utc="{{UPDATE_TIME_ISO}}">{{UPDATE_TIME}} MSK</span></div>
-                        <div class="line">> protocols: <span>VLESS, VMESS, TROJAN, SS, HY2</span></div>
+                        <div class="line">> telemetry: <span class="magic" id="sys-telemetry">…</span></div>
                         <div class="line">> obfuscation: <span class="magic">REALITY_ACTIVE</span></div>
                     </div>
                 </div>
@@ -326,6 +337,7 @@
         <section id="stats" class="content-section reveal">
             <div class="glass-card">
                 <h2><i class="fa-solid fa-chart-pie" style="color: var(--touhou-sakura);"></i> Статистика сети</h2>
+                <span class="lore-caption">幻想結界 ~ Phantasm Telemetry</span>
                 <div class="text-block">
                     <p>Актуальная статистика собранных и проверенных узлов. Данные обновляются каждые 4–6 часов вместе с подписками.</p>
                 </div>
