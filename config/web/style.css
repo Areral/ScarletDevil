@@ -630,6 +630,20 @@ section:last-of-type { border-bottom: none; }
 .app-icon { font-size: 1.8rem; color: var(--text-dim); transition: var(--trans); }
 .app-name { font-weight: 800; font-size: 0.75rem; letter-spacing: 0.5px; text-transform: uppercase; }
 
+/* --- PERF: skip layout/paint of off-screen sections (no visual change) ---
+   content-visibility:auto lets the browser bypass rendering work for sections
+   below the fold until they approach the viewport. `auto 800px` seeds an
+   intrinsic size so the scrollbar/anchor stays stable and the browser caches
+   each section's real size after first render. The IntersectionObserver-driven
+   .reveal animations still fire normally as sections scroll in. */
+.content-section { content-visibility: auto; contain-intrinsic-size: auto 800px; }
+
+/* --- PERF: freeze all CSS animations while the tab is in the background ---
+   Toggled by the visibilitychange handler in main.js. Most browsers already
+   throttle background tabs, but this guarantees zero animation work (and battery
+   drain) on mobile. Fully reversible — visuals are identical once visible. */
+body.is-hidden *, body.is-hidden *::before, body.is-hidden *::after { animation-play-state: paused !important; }
+
 /* --- TEXT BLOCKS & TYPOGRAPHY --- */
 .content-section h2 { font-size: clamp(1.3rem, 4vw, 2rem); color: #fff; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; font-style: italic; text-transform: uppercase; letter-spacing: -1px;}
 .content-section h2 i { color: var(--touhou-red); font-size: clamp(1.2rem, 4vw, 1.5rem); }

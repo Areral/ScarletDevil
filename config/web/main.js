@@ -33,8 +33,10 @@ const QR = (function() {
         [], [], [6,18], [6,22], [6,26], [6,30], [6,34]
     ];
 
-    // Precomputed format info for EC L + mask 0-7
-    const FORMAT_INFO = [0x5412, 0x5125, 0x5E7C, 0x5B4B, 0x45F9, 0x40CE, 0x4F97, 0x4AA0];
+    // Precomputed 15-bit format info (MSB-first) for EC level L + mask 0-7.
+    // The previous values were the EC-level-M strings, which mismatched the
+    // L-level data and made every code fail to decode.
+    const FORMAT_INFO = [0x77C4, 0x72F3, 0x7DAA, 0x789D, 0x662F, 0x6318, 0x6C41, 0x6976];
 
     function gfMul(a, b) {
         if (a === 0 || b === 0) return 0;
@@ -54,9 +56,11 @@ const QR = (function() {
     }
 
     function generatorPoly(degree) {
+        // Monic, highest-degree coefficient first (g[0] === 1). computeEC relies
+        // on the leading coefficient being at index 0 for the synthetic division.
         let g = [1];
         for (let i = 0; i < degree; i++)
-            g = polyMul(g, [EXP[i], 1]);
+            g = polyMul(g, [1, EXP[i]]);
         return g;
     }
 
@@ -118,102 +122,96 @@ const QR = (function() {
         return cw;
     }
 
-    function placeFinder(m, r, c) {
-        for (let i = 0; i < 7; i++)
-            for (let j = 0; j < 7; j++)
-                m[r + i][c + j] = (
-                    i === 0 || i === 6 || j === 0 || j === 6 ||
-                    (i >= 2 && i <= 4 && j >= 2 && j <= 4)
-                ) ? 1 : 0;
+    // Function-pattern placement. `modules` holds the 0/1 colour; `reserved`
+    // independently marks every function module (finder, separator, timing,
+    // alignment, dark, format) so the data zig-zag and the mask never overwrite
+    // them. The previous code used 0 for BOTH "empty" and "light function
+    // module", so data overwrote the timing pattern and finder whitespace,
+    // producing unscannable codes.
+    function formatLocations(size) {
+        // 15 format-info module coordinates, indexed by bit (LSB-first), per the
+        // QR spec. Copy A wraps the top-left finder; copy B splits along row 8
+        // (bits 0-7) and column 8 (bits 8-14).
+        const locA = [[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],
+                      [7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+        const locB = [[size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],
+                      [8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]];
+        return { locA, locB };
     }
 
-    function placeAlignment(m, row, col) {
-        for (let i = -2; i <= 2; i++)
-            for (let j = -2; j <= 2; j++)
-                m[row + i][col + j] = (
-                    i === -2 || i === 2 || j === -2 || j === 2 || (i === 0 && j === 0)
-                ) ? 1 : 0;
-    }
-
-    function buildMatrix(dataCW, ecBlocks, version) {
+    function placeFunctionPatterns(modules, reserved, version) {
         const size = version * 4 + 17;
-        // Init matrix: 0=empty, 1=reserved dark, 2=reserved light
-        const m = Array.from({length: size}, () => new Int32Array(size));
 
-        // Finder patterns
-        placeFinder(m, 0, 0);
-        placeFinder(m, 0, size - 7);
-        placeFinder(m, size - 7, 0);
+        // Finder (7x7) plus its 1-module light separator border.
+        function setFinder(r, c) {
+            for (let i = -1; i <= 7; i++) {
+                for (let j = -1; j <= 7; j++) {
+                    const rr = r + i, cc = c + j;
+                    if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
+                    reserved[rr][cc] = 1;
+                    if (i >= 0 && i <= 6 && j >= 0 && j <= 6) {
+                        modules[rr][cc] = (
+                            i === 0 || i === 6 || j === 0 || j === 6 ||
+                            (i >= 2 && i <= 4 && j >= 2 && j <= 4)
+                        ) ? 1 : 0;
+                    } else {
+                        modules[rr][cc] = 0; // separator
+                    }
+                }
+            }
+        }
+        setFinder(0, 0);
+        setFinder(0, size - 7);
+        setFinder(size - 7, 0);
 
-        // Separators
-        for (let i = 0; i < 8; i++) {
-            m[i][7] = m[7][i] = 2;
-            m[i][size - 8] = m[7][size - 1 - i] = 2;
-            m[size - 8][i] = m[size - 1 - i][7] = 2;
+        // Timing patterns (row 6 / col 6), alternating dark/light.
+        for (let i = 8; i < size - 8; i++) {
+            const v = (i % 2 === 0) ? 1 : 0;
+            if (!reserved[6][i]) { modules[6][i] = v; reserved[6][i] = 1; }
+            if (!reserved[i][6]) { modules[i][6] = v; reserved[i][6] = 1; }
         }
 
-        // Timing patterns
-        for (let i = 8; i < size - 8; i++)
-            m[6][i] = m[i][6] = (i % 2 === 0) ? 1 : 0;
-
-        // Alignment patterns
+        // Alignment patterns (versions 2-6 carry a single one clear of the finders).
         const apos = ALIGNMENT_POS[version];
         for (const ar of apos) {
             for (const ac of apos) {
-                if ((ar <= 8 && ac <= 8) || (ar <= 8 && ac >= size - 8) || (ar >= size - 8 && ac <= 8)) continue;
-                placeAlignment(m, ar, ac);
+                if (reserved[ar][ac]) continue; // centre overlaps a finder/timing — skip
+                for (let i = -2; i <= 2; i++) {
+                    for (let j = -2; j <= 2; j++) {
+                        modules[ar + i][ac + j] = (
+                            i === -2 || i === 2 || j === -2 || j === 2 || (i === 0 && j === 0)
+                        ) ? 1 : 0;
+                        reserved[ar + i][ac + j] = 1;
+                    }
+                }
             }
         }
 
-        // Dark module
-        m[size - 8][8] = 1;
+        // Dark module (always dark) + reserve the format-info cells.
+        modules[size - 8][8] = 1;
+        reserved[size - 8][8] = 1;
+        const { locA, locB } = formatLocations(size);
+        for (const [r, c] of locA) reserved[r][c] = 1;
+        for (const [r, c] of locB) reserved[r][c] = 1;
+    }
 
-        // Reserve format info areas
-        for (let i = 0; i < 9; i++) {
-            if (m[i][8] === 0) m[i][8] = 3;
-            if (i < 8 && m[8][i] === 0) m[8][i] = 3;
-        }
-        for (let i = 0; i < 8; i++) {
-            m[size - 1 - i][8] = 3;
-            if (i < 7) m[8][size - 1 - i] = 3;
-        }
-        // Reserve version info (v7+): none needed for v1-6
-
-        // Flatten all EC blocks into bit stream
-        const allBits = [];
-        for (let b = 0; b < EC_INFO[version].blocks; b++) {
-            for (let i = 0; i < EC_INFO[version].dataPerBlock; i++) {
-                const cw = dataCW[b * EC_INFO[version].dataPerBlock + i];
-                for (let j = 7; j >= 0; j--) allBits.push((cw >> j) & 1);
-            }
-            for (let i = 0; i < EC_INFO[version].ecPerBlock; i++) {
-                const cw = ecBlocks[b * EC_INFO[version].ecPerBlock + i];
-                for (let j = 7; j >= 0; j--) allBits.push((cw >> j) & 1);
-            }
-        }
-
-        // Place data in zigzag pattern, bottom-right to top-left
+    function placeData(modules, reserved, allBits, version) {
+        const size = version * 4 + 17;
         let bitIdx = 0;
         let up = true;
         for (let col = size - 1; col >= 0; col -= 2) {
-            if (col === 6) col = 5;
+            if (col === 6) col = 5; // skip the vertical timing column
             for (let row = up ? size - 1 : 0; up ? row >= 0 : row < size; row += up ? -1 : 1) {
                 for (const c of [col, col - 1]) {
-                    if (c < 0 || c >= size) continue;
-                    if (m[row][c] === 0) {
-                        if (bitIdx < allBits.length) {
-                            m[row][c] = allBits[bitIdx] ? 5 : 4; // 5=data-dark, 4=data-light
-                        } else {
-                            m[row][c] = 4; // fill remaining with light
-                        }
+                    if (c < 0) continue;
+                    if (!reserved[row][c]) {
+                        modules[row][c] = (bitIdx < allBits.length) ? allBits[bitIdx] : 0;
                         bitIdx++;
                     }
                 }
             }
             up = !up;
         }
-
-        return m;
     }
 
     function applyMaskPattern(row, col, mask) {
@@ -228,23 +226,6 @@ const QR = (function() {
             case 7: return ((row + col) % 2 + (row * col) % 3) % 2 === 0;
         }
         return false;
-    }
-
-    function maskMatrix(m, size, mask) {
-        const result = Array.from({length: size}, () => new Uint8Array(size));
-        for (let r = 0; r < size; r++) {
-            for (let c = 0; c < size; c++) {
-                let val = (m[r][c] === 1 || m[r][c] === 5); // 1=reserved dark, 5=data dark
-                // Don't mask function patterns (0-2 are basic, 3 is format reserve)
-                if (m[r][c] >= 4) { // data modules
-                    if (applyMaskPattern(r, c, mask)) val = !val;
-                } else if (m[r][c] === 3) { // format reserve
-                    if (applyMaskPattern(r, c, mask)) val = !val;
-                }
-                result[r][c] = val ? 1 : 0;
-            }
-        }
-        return result;
     }
 
     function evalPenalty(m, size) {
@@ -302,57 +283,61 @@ const QR = (function() {
 
     function placeFormat(m, size, mask) {
         const fi = FORMAT_INFO[mask];
-        // Top-left: bits 14..0
-        const coords = [
-            [8,0],[8,1],[8,2],[8,3],[8,4],[8,5], // bits 14-9
-            [size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8], // bits 8-2... wait
-        ];
-        // Actually, let me just use the right coordinates
-        // Location 1: around top-left finder
-        // bit 0: [size-1,8]
-        // Actually, the QR spec places format bits as follows:
-        // Location A (around top-left):
-        const locA = [[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
-        // Location B (split):
-        const locB = [[size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],[8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]];
-
+        const { locA, locB } = formatLocations(size);
         for (let i = 0; i < 15; i++) {
-            const bit = (fi >> i) & 1;
-            const [rA, cA] = locA[i];
-            const [rB, cB] = locB[i];
-            m[rA][cA] = bit;
-            m[rB][cB] = bit;
+            const bit = (fi >> (14 - i)) & 1; // MSB-first: locA[0] holds bit 14
+            m[locA[i][0]][locA[i][1]] = bit;
+            m[locB[i][0]][locB[i][1]] = bit;
         }
     }
 
     function generateMatrix(text) {
         const version = selectVersion(text.length);
         const info = EC_INFO[version];
+        const size = version * 4 + 17;
         const encoded = encodeByteMode(text, version);
 
-        // Split into blocks and compute EC per block
-        const ecBlocks = [];
+        // Per-block data + error-correction codewords.
+        const dataBlocks = [], ecBlocks = [];
         for (let b = 0; b < info.blocks; b++) {
             const blockData = encoded.slice(b * info.dataPerBlock, (b + 1) * info.dataPerBlock);
-            ecBlocks.push(...computeEC(blockData, info.ecPerBlock));
+            dataBlocks.push(blockData);
+            ecBlocks.push(computeEC(blockData, info.ecPerBlock));
         }
+        // Interleave: all data codewords (column-major across blocks), then all EC.
+        const finalCW = [];
+        for (let i = 0; i < info.dataPerBlock; i++)
+            for (let b = 0; b < info.blocks; b++)
+                finalCW.push(dataBlocks[b][i]);
+        for (let i = 0; i < info.ecPerBlock; i++)
+            for (let b = 0; b < info.blocks; b++)
+                finalCW.push(ecBlocks[b][i]);
 
-        const raw = buildMatrix(encoded, ecBlocks, version);
-        const size = version * 4 + 17;
+        const allBits = [];
+        for (const cw of finalCW)
+            for (let j = 7; j >= 0; j--) allBits.push((cw >> j) & 1);
 
-        // Evaluate all 8 masks
-        let bestMask = 0, bestPenalty = Infinity, bestMatrix = null;
+        // Build base matrix: function patterns + reserved map, then stream data.
+        const baseMod = Array.from({length: size}, () => new Int32Array(size));
+        const reserved = Array.from({length: size}, () => new Int32Array(size));
+        placeFunctionPatterns(baseMod, reserved, version);
+        placeData(baseMod, reserved, allBits, version);
+
+        // Evaluate all 8 masks (mask flips data modules only; format placed after).
+        let bestPenalty = Infinity, bestMatrix = null;
         for (let mask = 0; mask < 8; mask++) {
-            const masked = maskMatrix(raw, size, mask);
-            placeFormat(masked, size, mask);
-            const penalty = evalPenalty(masked, size);
+            const m = Array.from({length: size}, (_, r) => Int32Array.from(baseMod[r]));
+            for (let r = 0; r < size; r++)
+                for (let c = 0; c < size; c++)
+                    if (!reserved[r][c] && applyMaskPattern(r, c, mask))
+                        m[r][c] ^= 1;
+            placeFormat(m, size, mask);
+            const penalty = evalPenalty(m, size);
             if (penalty < bestPenalty) {
                 bestPenalty = penalty;
-                bestMask = mask;
-                bestMatrix = masked;
+                bestMatrix = m;
             }
         }
-        placeFormat(bestMatrix, size, bestMask);
         return { matrix: bestMatrix, size };
     }
 
@@ -1667,6 +1652,35 @@ function initFunPanel() {
         }
         saveFXStates();
     });
+
+    // --- PERF: pause interval-driven effects while the tab is hidden ---
+    // setInterval keeps firing in background tabs (unlike requestAnimationFrame,
+    // which the browser already throttles), so these spawners would keep creating
+    // off-screen DOM nodes and burning battery. Pause the active ones on hide and
+    // restore exactly those on return. body.is-hidden also freezes CSS animations
+    // (see style.css). The stardust canvas uses rAF, so it pauses on its own.
+    let fxResume = null;
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            fxResume = {
+                danmaku: !!danmakuInterval,
+                bats: !!batsInterval,
+                mist: !!mistParticleInterval.ref
+            };
+            if (danmakuInterval) { clearInterval(danmakuInterval); danmakuInterval = null; }
+            if (batsInterval) { clearInterval(batsInterval); batsInterval = null; }
+            if (mistParticleInterval.ref) { clearInterval(mistParticleInterval.ref); mistParticleInterval.ref = null; }
+            document.body.classList.add('is-hidden');
+        } else {
+            document.body.classList.remove('is-hidden');
+            if (fxResume) {
+                if (fxResume.danmaku && !danmakuInterval) startDanmaku();
+                if (fxResume.bats && !batsInterval) startBats();
+                if (fxResume.mist) startMistParticles();
+                fxResume = null;
+            }
+        }
+    });
 }
 
 // --- MOBILE NAVIGATION ---
@@ -1696,7 +1710,11 @@ function initMobileNav() {
         document.body.style.overflow = '';
     }
 
-    hamburger.addEventListener('click', openMobileNav);
+    hamburger.addEventListener('click', function () {
+        // Toggle: tapping the hamburger again while the menu is open closes it.
+        if (overlay.classList.contains('active')) closeMobileNav();
+        else openMobileNav();
+    });
     closeBtn.addEventListener('click', closeMobileNav);
     overlay.addEventListener('click', function(e) {
         if (e.target === overlay) closeMobileNav();
