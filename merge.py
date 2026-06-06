@@ -130,7 +130,8 @@ async def send_telegram_report(stats: dict) -> None:
             logger.error(f"  Ошибка отправки в Telegram: {exc}")
 
 
-def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
+def build_html(total_alive: int, top_speed: float, stats: dict,
+               history: list | None = None) -> None:
     template_path = "config/web/template.html"
     if not os.path.exists(template_path):
         logger.warning(f"  Шаблон не найден: {template_path} — пропуск.")
@@ -174,6 +175,19 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
         }
         node_stats_json = json.dumps(node_stats, ensure_ascii=False)
 
+        trends = compute_trends(history or [])
+
+        def _trend_str(pct):
+            return f"{pct:+.1f}" if pct is not None else ""
+
+        trend_nodes = _trend_str(trends["nodes_pct"])
+        trend_speed = _trend_str(trends["speed_pct"])
+        history_json = json.dumps(
+            [{"total": t, "max_speed": s}
+             for t, s in zip(trends["series_total"], trends["series_speed"])],
+            ensure_ascii=False,
+        )
+
         html_out = (
             tpl.replace("{{INJECT_CSS}}", css)
                .replace("{{INJECT_JS}}", js)
@@ -191,6 +205,9 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
                .replace("{{TROJAN_COUNT}}", str(stats.get("trojan_count", 0)))
                .replace("{{SS_COUNT}}", str(stats.get("ss_count", 0)))
                .replace("{{HY2_COUNT}}", str(stats.get("hy2_count", 0)))
+               .replace("{{TREND_NODES}}", trend_nodes)
+               .replace("{{TREND_SPEED}}", trend_speed)
+               .replace("{{HISTORY_JSON}}", history_json)
                .replace("{{COUNTRY_STATS_JSON}}", country_stats_json)
                .replace("{{NODE_STATS_JSON}}", node_stats_json)
         )
@@ -614,7 +631,8 @@ def main() -> None:
     GHA.endgroup()
 
     GHA.phase("④", "BUILD", "Compiling dashboard (index.html)")
-    build_html(stats["unique_alive"], stats["top_speed"], stats)
+    history = update_history(stats)
+    build_html(stats["unique_alive"], stats["top_speed"], stats, history)
     GHA.endgroup()
 
     GHA.phase("⑤", "NOTIFY", "Sending Telegram report")
