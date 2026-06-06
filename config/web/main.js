@@ -955,7 +955,40 @@ const PLATFORM_META = {
 let currentPlatform = 'windows';
 let currentAppId = PLATFORMS['windows'][0];
 
+// --- ROBUSTNESS: never leak raw template tokens to a visitor ---
+// Server-side substitution (merge.py::build_html) normally fills every token.
+// If a stale or un-substituted index.html ever ships, this fills the hero stats
+// from the embedded node-stats blob and rewrites any remaining {{...}} tokens in
+// visible text to an em-dash, so the page degrades cleanly instead of leaking
+// template syntax to the user.
+function healPlaceholders() {
+    var statsData = document.getElementById('stats-data');
+    var node = null;
+    if (statsData) {
+        var nj = statsData.getAttribute('data-node-stats');
+        if (nj && nj.indexOf('{{') === -1) {
+            try { node = JSON.parse(nj); } catch (e) { node = null; }
+        }
+    }
+    if (node) {
+        var hs = document.getElementById('hero-max-speed');
+        var hn = document.getElementById('hero-total-nodes');
+        if (hs && typeof node.max_speed === 'number') hs.textContent = node.max_speed;
+        if (hn && typeof node.total === 'number') hn.textContent = node.total;
+    }
+    try {
+        var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+        var n;
+        while ((n = walker.nextNode())) {
+            if (n.nodeValue.indexOf('{{') !== -1) {
+                n.nodeValue = n.nodeValue.replace(/\{\{[A-Z0-9_]+\}\}/g, '—');
+            }
+        }
+    } catch (e) { /* TreeWalker unavailable — non-critical */ }
+}
+
 function init() {
+    healPlaceholders();
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes("android") && ua.includes("tv")) currentPlatform = 'androidtv';
     else if (ua.includes("android")) currentPlatform = 'android';

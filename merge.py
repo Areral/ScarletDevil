@@ -1,5 +1,6 @@
 # --- START OF FILE merge.py ---
 import os
+import re
 import json
 import glob
 import base64
@@ -193,6 +194,15 @@ def build_html(total_alive: int, top_speed: float, stats: dict) -> None:
                .replace("{{COUNTRY_STATS_JSON}}", country_stats_json)
                .replace("{{NODE_STATS_JSON}}", node_stats_json)
         )
+
+        # Safety net: a placeholder in the template with no matching .replace()
+        # above must never reach the published page (the visible "{{MAX_SPEED}}"
+        # bug). Rewrite any survivor to an em-dash and shout about it in the log.
+        leftover = sorted(set(re.findall(r"\{\{[A-Z0-9_]+\}\}", html_out)))
+        if leftover:
+            logger.warning(f"  Незаполненные плейсхолдеры (заменены на «—»): {leftover}")
+            html_out = re.sub(r"\{\{[A-Z0-9_]+\}\}", "—", html_out)
+
         with open("index.html", "w", encoding="utf-8") as f:
             f.write(html_out)
 
