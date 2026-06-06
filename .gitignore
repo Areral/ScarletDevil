@@ -6,6 +6,7 @@
 data/*
 !data/source_health.json
 !data/pool.json
+!data/history.json
 
 # Go core build artifacts
 go_core/angra_core
