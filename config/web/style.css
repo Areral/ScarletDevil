@@ -1630,3 +1630,182 @@ section:last-of-type { border-bottom: none; }
     font-weight: 400;
     user-select: none;
 }
+
+/* ===== GENSOKYO ENHANCEMENT LAYER ===== */
+/* =====================================================================
+   SCARLET DEVIL — "Gensokyo" enhancement layer (additive, non-destructive)
+   Lifts the existing site toward the v3-gensokyo aesthetic: Unbounded display
+   type, sakura/gold/purple enrichment, atmospheric mesh + petals + danmaku
+   rings, kanji watermarks, gradient headings, ornate cards & buttons.
+   Loaded AFTER style.css so these rules win.
+   ===================================================================== */
+:root{
+  --display:'Unbounded',system-ui,sans-serif;
+  --gold:#c9a86a; --gold-soft:#e0c594;
+  --g-line:rgba(224,197,148,.16);
+  --sakura:var(--touhou-sakura); --sakura-soft:var(--touhou-sakura-glow);
+  --purple:var(--touhou-purple); --purple-glow:var(--touhou-purple-glow);
+  --ease-g:cubic-bezier(.2,.8,.2,1);
+}
+
+/* Move the opaque page background to <html> so the injected (z-index:-1)
+   atmosphere/petals render above it instead of being painted over by an
+   opaque <body> background. Our richer mesh replaces the old body gradients. */
+html{ background:var(--bg-void); }
+body{ background:transparent !important; }
+
+/* ---------- Atmosphere (injected by _enhance.js: .atmos-g / .petals-g) ---------- */
+.atmos-g{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.atmos-g .mesh{
+  position:absolute;inset:-12%;
+  background:
+    radial-gradient(46% 40% at 16% 12%, rgba(225,29,47,.26), transparent 60%),
+    radial-gradient(42% 38% at 86% 20%, rgba(148,108,248,.22), transparent 62%),
+    radial-gradient(50% 46% at 74% 90%, rgba(244,114,182,.16), transparent 60%),
+    radial-gradient(40% 40% at 6% 84%, rgba(159,18,57,.20), transparent 60%);
+  filter:saturate(1.08);
+  animation:meshDriftG 28s ease-in-out infinite alternate;
+}
+@keyframes meshDriftG{0%{transform:translate3d(0,0,0) scale(1)}100%{transform:translate3d(-2.4%,-2%,0) scale(1.06)}}
+.atmos-g .grain{
+  position:absolute;inset:0;opacity:.045;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.atmos-g .ring{
+  position:absolute;border-radius:50%;border:1px solid rgba(244,114,182,.10);
+  box-shadow:0 0 0 14px rgba(225,29,47,.03), inset 0 0 60px rgba(148,108,248,.05);
+  animation:ringPulseG 10s ease-in-out infinite;
+}
+.atmos-g .ring.r1{width:520px;height:520px;top:-180px;right:-140px;border-color:rgba(225,29,47,.12)}
+.atmos-g .ring.r2{width:340px;height:340px;top:-90px;right:-50px;border-color:rgba(244,114,182,.10);animation-delay:1.6s}
+.atmos-g .ring.r3{width:660px;height:660px;bottom:-300px;left:-220px;border-color:rgba(148,108,248,.10);animation-delay:.8s}
+@keyframes ringPulseG{0%,100%{transform:scale(1);opacity:.65}50%{transform:scale(1.05);opacity:.95}}
+
+.petals-g{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.petal-g{
+  position:absolute;top:-6vh;width:13px;height:13px;opacity:0;
+  background:radial-gradient(circle at 30% 30%, var(--sakura-soft), var(--sakura) 70%);
+  border-radius:80% 0 80% 0;filter:drop-shadow(0 0 6px rgba(244,114,182,.45));
+  animation:fallG linear infinite;
+}
+@keyframes fallG{
+  0%{transform:translateY(-10vh) translateX(0) rotate(0)}
+  8%{opacity:.8}92%{opacity:.6}
+  100%{transform:translateY(112vh) translateX(54px) rotate(420deg);opacity:0}
+}
+
+/* kanji watermarks injected per section */
+.kanji-g{
+  position:absolute;font-family:var(--display);font-weight:900;color:transparent;
+  -webkit-text-stroke:1px rgba(244,114,182,.09);
+  font-size:clamp(110px,18vw,300px);line-height:.8;z-index:-1;pointer-events:none;user-select:none;
+}
+
+/* ---------- Typography: Unbounded display + gradient headings ---------- */
+.hero h1, .content-section h2, .stats-card-title, .glass-card h2{
+  font-family:var(--display) !important; font-weight:800 !important;
+  letter-spacing:-.012em !important; font-style:normal !important;
+}
+.hero h1{ text-transform:none !important; }
+.hero h1, .content-section h2{
+  background:linear-gradient(118deg,#fff 14%,var(--sakura-soft) 56%,var(--gold-soft) 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+/* keep the section-heading icon visible (don't let gradient clip it) */
+.content-section h2 i{
+  -webkit-text-fill-color:initial; color:var(--touhou-red);
+  filter:drop-shadow(0 0 10px rgba(225,29,47,.4));
+}
+/* big metric numbers in display face */
+.stat-value{ font-family:var(--display) !important; font-weight:800 !important; }
+
+/* ---------- Buttons: gradient + shine sweep ---------- */
+.btn-primary{
+  background:linear-gradient(135deg,var(--touhou-red),var(--touhou-crimson) 55%,var(--touhou-purple)) !important;
+  box-shadow:0 10px 30px rgba(225,29,47,.4), inset 0 1px 0 rgba(255,255,255,.22) !important;
+  position:relative;overflow:hidden;
+}
+.btn-primary::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.32),transparent);
+  transform:translateX(-130%);transition:.6s var(--ease-g);
+}
+.btn-primary:hover::after{transform:translateX(130%)}
+.btn-secondary:hover{ border-color:var(--sakura) !important; color:#fff !important; background:rgba(244,114,182,.08) !important; }
+
+/* ---------- Status badge ---------- */
+.status-badge{
+  background:rgba(225,29,47,.07) !important; border:1px solid rgba(225,29,47,.22) !important;
+  color:var(--gold-soft) !important;
+}
+
+/* ---------- Cards: ornate gradient frame + lift ---------- */
+.glass-card, .stat-panel, .stats-card{
+  background:linear-gradient(160deg, var(--bg-card), rgba(15,7,12,.65)) !important;
+  border:1px solid var(--g-line) !important;
+  box-shadow:0 18px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04) !important;
+  position:relative;
+}
+.glass-card::before, .stats-card::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none !important;z-index:0;
+  background:linear-gradient(135deg,rgba(225,29,47,.45),transparent 35%,transparent 65%,rgba(148,108,248,.45));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;
+}
+.glass-card>*, .stats-card>*{position:relative;z-index:1}
+.stats-card:hover{ transform:translateY(-4px); border-color:rgba(225,29,47,.3) !important; }
+
+/* ---------- Chart fills: richer gradients ---------- */
+.chart-bar-fill{ background:linear-gradient(90deg,var(--touhou-crimson),var(--touhou-red-glow)) !important; }
+.chart-bar-fill.bar-country{ background:linear-gradient(90deg,var(--sakura),var(--purple-glow)) !important; }
+
+/* ---------- Side-nav active accent ---------- */
+.nav-btn.active .nav-dot{
+  background:linear-gradient(135deg,var(--touhou-crimson),var(--touhou-purple)) !important;
+  box-shadow:0 0 12px var(--sakura) !important;
+}
+
+/* ---------- FAQ ---------- */
+.faq-item{ background:linear-gradient(160deg,var(--bg-card),rgba(15,7,12,.6)) !important; border:1px solid var(--g-line) !important; }
+.faq-question{ font-family:var(--display) !important; font-weight:700 !important; }
+
+/* ---------- Trend chip (hero) tint to gensokyo ---------- */
+.trend-chip.trend-up{ color:#34d399 !important; background:rgba(16,185,129,.12) !important; }
+.trend-chip.trend-down{ color:var(--sakura-soft) !important; background:rgba(244,114,182,.12) !important; }
+
+/* ---------- (1) Remove danmaku / mansion spirits / CRT scanline ---------- */
+#btn-danmaku, #btn-bats, #btn-scanline,
+#btn-danmaku-mobile, #btn-bats-mobile, #btn-scanline-mobile{ display:none !important; }
+#scanline-overlay{ display:none !important; }
+
+/* ---------- (3) Statistics section — refined layout ---------- */
+/* Speed summary becomes a full-width band of tiles instead of a lonely
+   left-column card with an empty cell beside it. */
+.stats-card:has(.stats-summary){ grid-column:1 / -1; }
+.stats-summary{
+  display:grid !important;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:14px;
+}
+.summary-item{
+  flex-direction:column !important; align-items:flex-start !important; gap:7px !important;
+  background:linear-gradient(160deg,rgba(255,255,255,.03),rgba(0,0,0,.25)) !important;
+  border:1px solid var(--g-line) !important; border-radius:14px !important; padding:16px 18px !important;
+  transition:transform var(--t-fast,.2s) var(--ease-g), border-color var(--t-fast,.2s) var(--ease-g);
+}
+.summary-item:hover{ transform:translateY(-3px); border-color:rgba(225,29,47,.3) !important; }
+.summary-label{
+  font-family:var(--mono) !important; font-size:.62rem !important; letter-spacing:.14em !important;
+  text-transform:uppercase !important; color:var(--ink-mute,#9a8090) !important;
+}
+.summary-value{
+  font-family:var(--display) !important; font-size:1.7rem !important; font-weight:800 !important;
+  color:var(--gold-soft) !important;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  .atmos-g .mesh, .atmos-g .ring, .petals-g{ display:none !important; }
+  .btn-primary::after{ display:none !important; }
+}
+

@@ -2083,3 +2083,68 @@ function initStats() {
 }
 
 init();
+
+/* ===== GENSOKYO ENHANCEMENT LAYER ===== */
+/* =====================================================================
+   SCARLET DEVIL — "Gensokyo" enhancement layer JS (additive)
+   Injects atmospheric mesh + danmaku rings + grain, drifting sakura petals,
+   and per-section kanji watermarks. Runs after the main bundle; purely
+   decorative, fully gated on prefers-reduced-motion. Touches nothing existing.
+   ===================================================================== */
+(function(){
+  var reduce = false;
+  try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+
+  function el(cls){ var d=document.createElement('div'); if(cls) d.className=cls; return d; }
+
+  // --- atmosphere (mesh + rings + grain) ---
+  var atmos = el('atmos-g');
+  atmos.setAttribute('aria-hidden','true');
+  atmos.appendChild(el('mesh'));
+  ['r1','r2','r3'].forEach(function(r){ atmos.appendChild(el('ring '+r)); });
+  atmos.appendChild(el('grain'));
+  document.body.insertBefore(atmos, document.body.firstChild);
+
+  // --- sakura petals ---
+  if(!reduce){
+    var pl = el('petals-g'); pl.setAttribute('aria-hidden','true');
+    var N = 12;
+    for(var i=0;i<N;i++){
+      var p = el('petal-g');
+      var left = Math.round((i/N)*100 + (i*7)%9);   // deterministic spread
+      var dur = 11 + (i%6)*2.5;
+      var delay = -(i*1.7);
+      var sc = 0.7 + (i%4)*0.18;
+      p.style.left = left + 'vw';
+      p.style.animationDuration = dur + 's';
+      p.style.animationDelay = delay + 's';
+      p.style.transform = 'scale('+sc.toFixed(2)+')';
+      pl.appendChild(p);
+    }
+    document.body.insertBefore(pl, document.body.firstChild);
+  }
+
+  // --- per-section kanji watermarks ---
+  var kanji = {
+    home:'紅', about:'館', guide:'設', theory_bs:'分', theory_isp:'守',
+    stats:'魔', protocols:'郷', faq:'問', glossary:'語', contacts:'信'
+  };
+  Object.keys(kanji).forEach(function(id){
+    var sec = document.getElementById(id);
+    if(!sec) return;
+    if(getComputedStyle(sec).position === 'static') sec.style.position = 'relative';
+    // isolate the section so the z-index:-1 kanji sits behind the section's
+    // own content but above the page atmosphere (does not leak to the root).
+    sec.style.isolation = 'isolate';
+    var k = document.createElement('span');
+    k.className = 'kanji-g';
+    k.textContent = kanji[id];
+    k.setAttribute('aria-hidden','true');
+    // alternate corner placement so they don't all sit the same way
+    var right = Object.keys(kanji).indexOf(id) % 2 === 0;
+    k.style.top = '-10px';
+    k.style[right ? 'right' : 'left'] = '-10px';
+    sec.appendChild(k);
+  });
+})();
+
