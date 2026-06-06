@@ -1566,10 +1566,11 @@ section:last-of-type { border-bottom: none; }
         transition-duration: 0.001ms !important;
         scroll-behavior: auto !important;
     }
-    .hero-sparkline, .scan-sweep { display: none !important; }
+    .hero-sparkline { display: none !important; }
+    .stat-panel::after { display: none !important; }
 }
 
-/* --- Hero: trend chips, sparkline, scan-sweep --- */
+/* --- Hero: trend chips, sparkline, card sheen --- */
 .trend-chip {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.62rem;
@@ -1591,21 +1592,27 @@ section:last-of-type { border-bottom: none; }
     opacity: 0.9;
 }
 
-.dashboard { position: relative; overflow: hidden; }
-.scan-sweep {
+/* Subtle scarlet sheen, confined to each rounded stat card (clipped by the
+   panel's own border-radius via overflow:hidden) — no stray rectangle, and the
+   card content stays above the sheen so numbers remain crisp. */
+.stat-panel { position: relative; overflow: hidden; }
+.stat-panel > * { position: relative; z-index: 1; }
+.stat-panel::after {
+    content: "";
     position: absolute;
     inset: 0;
+    z-index: 0;
     pointer-events: none;
     background: linear-gradient(120deg, transparent 0%,
-        rgba(225, 29, 72, 0.07) 48%, rgba(255, 45, 85, 0.12) 50%,
-        rgba(225, 29, 72, 0.07) 52%, transparent 100%);
+        rgba(255, 45, 85, 0.05) 48%, rgba(255, 45, 85, 0.09) 50%,
+        rgba(255, 45, 85, 0.05) 52%, transparent 100%);
     background-size: 220% 100%;
     background-position: 200% 0;
-    animation: scan-sweep-move 7s var(--ease-scarlet) infinite;
+    animation: panel-sheen 8s var(--ease-scarlet) infinite;
 }
-@keyframes scan-sweep-move {
+@keyframes panel-sheen {
     0%   { background-position: 200% 0; }
-    60%  { background-position: -60% 0; }
+    55%  { background-position: -60% 0; }
     100% { background-position: -60% 0; }
 }
 #sys-telemetry { transition: opacity var(--motion-fast) var(--ease-scarlet); }
