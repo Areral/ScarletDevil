@@ -1609,3 +1609,17 @@ section:last-of-type { border-bottom: none; }
     100% { background-position: -60% 0; }
 }
 #sys-telemetry { transition: opacity var(--motion-fast) var(--ease-scarlet); }
+
+/* Quiet Touhou spell-card captions — present if you look, ignorable if not. */
+.lore-caption {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--touhou-sakura);
+    opacity: 0.33;
+    margin-top: 4px;
+    font-weight: 400;
+    user-select: none;
+}
