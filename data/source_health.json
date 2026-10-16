@@ -1,10 +1,10 @@
 {
   "https://raw.githubusercontent.com/sakha1370/OpenRay/refs/heads/main/output/all_valid_proxies.txt": {
-    "total_parsed": 3274469,
-    "total_alive": 149212,
-    "last_check": 1792168382.4928312,
+    "total_parsed": 3277684,
+    "total_alive": 149411,
+    "last_check": 1792191358.349003,
     "consecutive_failures": 0,
-    "last_success": 1792168382.4928312
+    "last_success": 1792191358.349003
   },
   "https://raw.githubusercontent.com/free18/v2ray/refs/heads/main/v.txt": {
     "total_parsed": 77085,
@@ -15,11 +15,11 @@
     "excluded_until": 1792192625.4744225
   },
   "https://raw.githubusercontent.com/wuqb2i4f/xray-config-toolkit/main/output/base64/mix-uri": {
-    "total_parsed": 68048,
-    "total_alive": 6016,
-    "last_check": 1792168382.4928532,
-    "consecutive_failures": 1,
-    "last_success": 1792141776.3461099
+    "total_parsed": 68058,
+    "total_alive": 6018,
+    "last_check": 1792191358.3490233,
+    "consecutive_failures": 0,
+    "last_success": 1792191358.3490233
   },
   "https://raw.githubusercontent.com/MahsaNetConfigTopic/config/refs/heads/main/xray_final.txt": {
     "total_parsed": 16235,
@@ -32,8 +32,8 @@
   "https://raw.githubusercontent.com/Hidashimora/free-vpn-anti-rkn/main/configs/1.2.txt": {
     "total_parsed": 10350,
     "total_alive": 53,
-    "last_check": 1792168382.4928653,
-    "consecutive_failures": 2,
+    "last_check": 1792191358.3495052,
+    "consecutive_failures": 3,
     "last_success": 1792122305.6769238
   },
   "https://raw.githubusercontent.com/LimeHi/LimeVPN/refs/heads/main/LimeVPN.txt": {
@@ -45,11 +45,11 @@
     "excluded_until": 1792208705.6774974
   },
   "https://raw.githubusercontent.com/mheidari98/.proxy/refs/heads/main/vless": {
-    "total_parsed": 2192644,
-    "total_alive": 15096,
-    "last_check": 1792168382.4928684,
+    "total_parsed": 2198019,
+    "total_alive": 15099,
+    "last_check": 1792191358.3495083,
     "consecutive_failures": 0,
-    "last_success": 1792168382.4928684
+    "last_success": 1792191358.3495083
   },
   "https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/trojan.txt": {
     "total_parsed": 6320,
@@ -68,17 +68,18 @@
     "excluded_until": 1792192625.4750304
   },
   "https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/shadowsocks.txt": {
-    "total_parsed": 10200,
+    "total_parsed": 10208,
     "total_alive": 1457,
-    "last_check": 1792168382.4928737,
-    "consecutive_failures": 4,
-    "last_success": 1791089996.0333064
+    "last_check": 1792191358.3495111,
+    "consecutive_failures": 5,
+    "last_success": 1791089996.0333064,
+    "excluded_until": 1792277758.3495111
   },
   "https://raw.githubusercontent.com/miladtahanian/V2RayCFGDumper/refs/heads/main/sub.txt": {
-    "total_parsed": 9321,
+    "total_parsed": 9356,
     "total_alive": 410,
-    "last_check": 1792168382.492879,
-    "consecutive_failures": 0,
+    "last_check": 1792191358.3497639,
+    "consecutive_failures": 1,
     "last_success": 1792168382.492879
   },
   "https://gitverse.ru/api/repos/bywarm/rser/raw/branch/master/wl.txt": {
@@ -100,9 +101,10 @@
   "https://raw.githubusercontent.com/Pawdroid/Free-servers/refs/heads/main/sub": {
     "total_parsed": 1501,
     "total_alive": 201,
-    "last_check": 1792168382.4935782,
-    "consecutive_failures": 4,
-    "last_success": 1791892209.560899
+    "last_check": 1792191358.349769,
+    "consecutive_failures": 5,
+    "last_success": 1791892209.560899,
+    "excluded_until": 1792277758.349769
   },
   "https://nowmeow.pw/8ybBd3fdCAQ6Ew5H0d66Y1hMbh63GpKUtEXQClIu/whitelist": {
     "total_parsed": 3571,
@@ -113,11 +115,12 @@
     "excluded_until": 1792254782.4935875
   },
   "https://raw.githubusercontent.com/zieng2/wl/main/vless_universal.txt": {
-    "total_parsed": 42757,
+    "total_parsed": 42771,
     "total_alive": 1585,
-    "last_check": 1792168382.4939132,
-    "consecutive_failures": 4,
-    "last_success": 1792082851.159506
+    "last_check": 1792191358.3500338,
+    "consecutive_failures": 5,
+    "last_success": 1792082851.159506,
+    "excluded_until": 1792277758.3500338
   },
   "https://raw.githubusercontent.com/Hidashimora/free-vpn-anti-rkn/main/configs/1.txt": {
     "total_parsed": 89526,
@@ -128,18 +131,18 @@
     "excluded_until": 1792228176.3474083
   },
   "https://subrostunnel.vercel.app/gen.txt": {
-    "total_parsed": 30479,
+    "total_parsed": 30482,
     "total_alive": 2289,
-    "last_check": 1792168382.4939167,
-    "consecutive_failures": 2,
+    "last_check": 1792191358.3503287,
+    "consecutive_failures": 3,
     "last_success": 1792122305.6778443
   },
   "https://raw.githubusercontent.com/roosterkid/openproxylist/refs/heads/main/V2RAY_RAW.txt": {
-    "total_parsed": 12679,
-    "total_alive": 2234,
-    "last_check": 1792168382.4939191,
+    "total_parsed": 12688,
+    "total_alive": 2236,
+    "last_check": 1792191358.3503332,
     "consecutive_failures": 0,
-    "last_success": 1792168382.4939191
+    "last_success": 1792191358.3503332
   },
   "https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/vless.txt": {
     "total_parsed": 39944,
@@ -174,32 +177,32 @@
     "excluded_until": 1792192625.475789
   },
   "https://raw.githubusercontent.com/miladtahanian/Config-Collector/refs/heads/main/mixed_iran.txt": {
-    "total_parsed": 65504,
-    "total_alive": 705,
-    "last_check": 1792168382.4941933,
-    "consecutive_failures": 4,
-    "last_success": 1791892209.5613844
+    "total_parsed": 65644,
+    "total_alive": 706,
+    "last_check": 1792191358.3503375,
+    "consecutive_failures": 0,
+    "last_success": 1792191358.3503375
   },
   "https://raw.githubusercontent.com/whoahaow/rjsxrd/refs/heads/main/githubmirror/bypass/bypass-all.txt": {
-    "total_parsed": 87914,
-    "total_alive": 8262,
-    "last_check": 1792168382.4942002,
+    "total_parsed": 88029,
+    "total_alive": 8271,
+    "last_check": 1792191358.3505816,
     "consecutive_failures": 0,
-    "last_success": 1792168382.4942002
+    "last_success": 1792191358.3505816
   },
   "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/BLACK_VLESS_RUS_mobile.txt": {
-    "total_parsed": 17322,
-    "total_alive": 1606,
-    "last_check": 1792168382.494204,
-    "consecutive_failures": 1,
-    "last_success": 1792141776.3481913
+    "total_parsed": 17327,
+    "total_alive": 1607,
+    "last_check": 1792191358.3505893,
+    "consecutive_failures": 0,
+    "last_success": 1792191358.3505893
   },
   "https://gitverse.ru/api/repos/bywarm/rser/raw/branch/master/black.txt": {
-    "total_parsed": 1795641,
-    "total_alive": 12584,
-    "last_check": 1792168382.4942074,
+    "total_parsed": 1798374,
+    "total_alive": 12588,
+    "last_check": 1792191358.3508282,
     "consecutive_failures": 0,
-    "last_success": 1792168382.4942074
+    "last_success": 1792191358.3508282
   },
   "https://github.com/Epodonios/v2ray-configs/raw/main/Splitted-By-Protocol/trojan.txt": {
     "total_parsed": 7348,
@@ -210,24 +213,24 @@
     "excluded_until": 1792228176.3481972
   },
   "https://raw.githubusercontent.com/sevcator/5ubscrpt10n/main/protocols/vl.txt": {
-    "total_parsed": 35667673,
+    "total_parsed": 35732051,
     "total_alive": 20660,
-    "last_check": 1792168382.494211,
-    "consecutive_failures": 2,
+    "last_check": 1792191358.3508327,
+    "consecutive_failures": 3,
     "last_success": 1792122305.6781406
   },
   "https://raw.githubusercontent.com/shabane/kamaji/master/hub/merged.txt": {
-    "total_parsed": 3288154,
-    "total_alive": 6497,
-    "last_check": 1792168382.4942138,
+    "total_parsed": 3294617,
+    "total_alive": 6502,
+    "last_check": 1792191358.3508368,
     "consecutive_failures": 0,
-    "last_success": 1792168382.4942138
+    "last_success": 1792191358.3508368
   },
   "https://raw.githubusercontent.com/sevcator/5ubscrpt10n/main/protocols/tr.txt": {
-    "total_parsed": 15133811,
+    "total_parsed": 15161904,
     "total_alive": 13443,
-    "last_check": 1792168382.494217,
-    "consecutive_failures": 0,
+    "last_check": 1792191358.3508437,
+    "consecutive_failures": 1,
     "last_success": 1792168382.494217
   },
   "https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/refs/heads/main/category/trojan.txt": {
@@ -241,9 +244,10 @@
   "https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt": {
     "total_parsed": 265,
     "total_alive": 6,
-    "last_check": 1792168382.4942205,
-    "consecutive_failures": 4,
-    "last_success": 1791494752.9690833
+    "last_check": 1792191358.3508463,
+    "consecutive_failures": 5,
+    "last_success": 1791494752.9690833,
+    "excluded_until": 1792277758.3508463
   },
   "https://raw.githubusercontent.com/CidVpn/cid-vpn-config/refs/heads/main/general.txt": {
     "total_parsed": 58469,
@@ -253,24 +257,24 @@
     "excluded_until": 1792228176.3487084
   },
   "https://raw.githubusercontent.com/sevcator/5ubscrpt10n/main/protocols/ss.txt": {
-    "total_parsed": 3198044,
-    "total_alive": 1797,
-    "last_check": 1792168382.4942226,
+    "total_parsed": 3203446,
+    "total_alive": 1798,
+    "last_check": 1792191358.3510878,
     "consecutive_failures": 0,
-    "last_success": 1792168382.4942226
+    "last_success": 1792191358.3510878
   },
   "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/All_Configs_Sub.txt": {
-    "total_parsed": 22009,
+    "total_parsed": 22061,
     "total_alive": 217,
-    "last_check": 1792168382.4942255,
-    "consecutive_failures": 2,
+    "last_check": 1792191358.3510945,
+    "consecutive_failures": 3,
     "last_success": 1791935957.8304994
   },
   "https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector/refs/heads/main/sub/mix": {
-    "total_parsed": 9458,
+    "total_parsed": 9466,
     "total_alive": 19,
-    "last_check": 1792168382.494227,
-    "consecutive_failures": 3,
+    "last_check": 1792191358.351098,
+    "consecutive_failures": 4,
     "last_success": 1792106225.476434
   },
   "https://wlrus.lol/confs/merged.txt": {
@@ -305,11 +309,12 @@
     "excluded_until": 1792228176.3494897
   },
   "https://raw.githubusercontent.com/acymz/AutoVPN/refs/heads/main/data/V2.txt": {
-    "total_parsed": 11315,
+    "total_parsed": 11333,
     "total_alive": 1210,
-    "last_check": 1792168382.494229,
-    "consecutive_failures": 4,
-    "last_success": 1792082851.160326
+    "last_check": 1792191358.3511014,
+    "consecutive_failures": 5,
+    "last_success": 1792082851.160326,
+    "excluded_until": 1792277758.3511014
   },
   "https://raw.githubusercontent.com/LalatinaHub/Mineral/refs/heads/master/result/nodes": {
     "total_parsed": 13048,
@@ -343,11 +348,12 @@
     "excluded_until": 1792208705.6790829
   },
   "https://raw.githubusercontent.com/MahanKenway/Freedom-V2Ray/main/configs/vmess_sub.txt": {
-    "total_parsed": 202450,
+    "total_parsed": 202562,
     "total_alive": 10,
-    "last_check": 1792168382.4942322,
-    "consecutive_failures": 4,
-    "last_success": 1791285909.8124182
+    "last_check": 1792191358.3513787,
+    "consecutive_failures": 5,
+    "last_success": 1791285909.8124182,
+    "excluded_until": 1792277758.3513787
   },
   "https://raw.githubusercontent.com/barry-far/V2ray-Config/main/Splitted-By-Protocol/trojan.txt": {
     "total_parsed": 116,
@@ -374,11 +380,12 @@
     "excluded_until": 1792192625.4766955
   },
   "https://raw.githubusercontent.com/MahanKenway/Freedom-V2Ray/main/configs/trojan_sub.txt": {
-    "total_parsed": 793,
+    "total_parsed": 797,
     "total_alive": 12,
-    "last_check": 1792168382.4942346,
-    "consecutive_failures": 4,
-    "last_success": 1791693852.451941
+    "last_check": 1792191358.351633,
+    "consecutive_failures": 5,
+    "last_success": 1791693852.451941,
+    "excluded_until": 1792277758.351633
   },
   "https://raw.githubusercontent.com/slxkware/Vless-list/main/Black%20Vless.txt": {
     "total_parsed": 218,
@@ -391,9 +398,10 @@
   "https://raw.githubusercontent.com/snakem982/proxypool/main/source/v2ray-2.txt": {
     "total_parsed": 6824,
     "total_alive": 452,
-    "last_check": 1792168382.4942377,
-    "consecutive_failures": 4,
-    "last_success": 1792082851.160342
+    "last_check": 1792191358.3518624,
+    "consecutive_failures": 5,
+    "last_success": 1792082851.160342,
+    "excluded_until": 1792277758.3518624
   },
   "https://raw.githubusercontent.com/helptmoop/Free-Telegram-Proxies/main/global-iran-russia-proxies.txt": {
     "total_parsed": 0,
@@ -405,10 +413,9 @@
   "https://raw.githubusercontent.com/F0rc3Run/F0rc3Run/main/splitted-by-protocol/vmess.txt": {
     "total_parsed": 1881,
     "total_alive": 63,
-    "last_check": 1792082851.1606169,
-    "consecutive_failures": 5,
-    "last_success": 1791522809.9906104,
-    "excluded_until": 1792169251.1606169
+    "last_check": 1792191358.3521118,
+    "consecutive_failures": 1,
+    "last_success": 1791522809.9906104
   },
   "https://raw.githubusercontent.com/F0rc3Run/F0rc3Run/main/splitted-by-protocol/trojan.txt": {
     "total_parsed": 0,
@@ -463,18 +470,19 @@
     "excluded_until": 1792228176.3517153
   },
   "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt": {
-    "total_parsed": 1067,
+    "total_parsed": 1069,
     "total_alive": 83,
-    "last_check": 1792168382.4947844,
-    "consecutive_failures": 3,
+    "last_check": 1792191358.3521152,
+    "consecutive_failures": 4,
     "last_success": 1791919163.6987956
   },
   "https://raw.githubusercontent.com/barry-far/V2ray-Config/main/All_Configs_Sub.txt": {
     "total_parsed": 3925,
     "total_alive": 78,
-    "last_check": 1792168382.4947917,
-    "consecutive_failures": 4,
-    "last_success": 1792082851.1609151
+    "last_check": 1792191358.3521252,
+    "consecutive_failures": 5,
+    "last_success": 1792082851.1609151,
+    "excluded_until": 1792277758.3521252
   },
   "https://raw.githubusercontent.com/barry-far/V2ray-Config/main/Splitted-By-Protocol/vless.txt": {
     "total_parsed": 924,
@@ -568,10 +576,10 @@
     "excluded_until": 1792228176.3539577
   },
   "https://raw.githubusercontent.com/MatinGhanbari/v2ray-configs/main/subscriptions/base64/all_sub.txt": {
-    "total_parsed": 187724,
+    "total_parsed": 187982,
     "total_alive": 149,
-    "last_check": 1792168382.494795,
-    "consecutive_failures": 3,
+    "last_check": 1792191358.3523664,
+    "consecutive_failures": 4,
     "last_success": 1792106225.4775977
   },
   "https://raw.githubusercontent.com/xyfqzy/free-nodes/main/nodes/shadowsocks.txt": {
@@ -597,11 +605,11 @@
     "excluded_until": 1792228176.3546925
   },
   "https://etoneya.su/1": {
-    "total_parsed": 203988,
-    "total_alive": 13058,
-    "last_check": 1792168382.4947977,
+    "total_parsed": 204507,
+    "total_alive": 13068,
+    "last_check": 1792191358.352376,
     "consecutive_failures": 0,
-    "last_success": 1792168382.4947977
+    "last_success": 1792191358.352376
   },
   "https://wlrus.lol/confs/selected.txt": {
     "total_parsed": 70,
@@ -611,10 +619,10 @@
     "excluded_until": 1792228176.3550334
   },
   "https://raw.githubusercontent.com/kort0881/vpn-checker-backend/main/checked/RU_Best/ru_white_all_WHITE.txt": {
-    "total_parsed": 355156,
+    "total_parsed": 355738,
     "total_alive": 763,
-    "last_check": 1792168382.4948018,
-    "consecutive_failures": 1,
+    "last_check": 1792191358.3523803,
+    "consecutive_failures": 2,
     "last_success": 1792141776.3554695
   },
   "https://raw.githubusercontent.com/Kirill39127/-my-sub/refs/heads/main/sub.txt": {
@@ -635,9 +643,10 @@
   "https://raw.githubusercontent.com/Maskkost93/kizyak-vpn-4.0/refs/heads/main/kizyakbeta6BL.txt?": {
     "total_parsed": 2095,
     "total_alive": 294,
-    "last_check": 1792168382.4948046,
-    "consecutive_failures": 4,
-    "last_success": 1791285909.81326
+    "last_check": 1792191358.352384,
+    "consecutive_failures": 5,
+    "last_success": 1791285909.81326,
+    "excluded_until": 1792277758.352384
   },
   "https://raw.githubusercontent.com/Maskkost93/kizyak-vpn-4.0/refs/heads/main/kizyakbeta6.txt": {
     "total_parsed": 658,
@@ -665,9 +674,10 @@
   "https://alley.serv00.net/other": {
     "total_parsed": 11565,
     "total_alive": 767,
-    "last_check": 1792168382.494808,
-    "consecutive_failures": 4,
-    "last_success": 1791285909.8134406
+    "last_check": 1792191358.3526258,
+    "consecutive_failures": 5,
+    "last_success": 1791285909.8134406,
+    "excluded_until": 1792277758.3526258
   },
   "https://alley.serv00.net/youtube": {
     "total_parsed": 48,
@@ -693,10 +703,10 @@
     "excluded_until": 1792228176.3571033
   },
   "https://rostunnel.vercel.app/mega.txt": {
-    "total_parsed": 391972,
+    "total_parsed": 392967,
     "total_alive": 1102,
-    "last_check": 1792168382.4948099,
-    "consecutive_failures": 1,
+    "last_check": 1792191358.3528829,
+    "consecutive_failures": 2,
     "last_success": 1792141776.3573215
   },
   "https://subrostunnel.vercel.app/wl.txt": {
@@ -739,9 +749,10 @@
   "https://raw.githubusercontent.com/ewecrow78-gif/whitelist1/main/list.txt": {
     "total_parsed": 732,
     "total_alive": 9,
-    "last_check": 1792168382.4948127,
-    "consecutive_failures": 4,
-    "last_success": 1791892209.562007
+    "last_check": 1792191358.352889,
+    "consecutive_failures": 5,
+    "last_success": 1791892209.562007,
+    "excluded_until": 1792277758.352889
   },
   "https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist_full": {
     "total_parsed": 0,
@@ -765,11 +776,12 @@
     "excluded_until": 1792228176.3587093
   },
   "https://raw.githubusercontent.com/btsk161/Freeinternet_byMygalaru.github.io/refs/heads/main/premium.txt": {
-    "total_parsed": 923,
+    "total_parsed": 932,
     "total_alive": 67,
-    "last_check": 1792168382.4948142,
-    "consecutive_failures": 4,
-    "last_success": 1791250472.5069697
+    "last_check": 1792191358.353138,
+    "consecutive_failures": 5,
+    "last_success": 1791250472.5069697,
+    "excluded_until": 1792277758.353138
   },
   "https://raw.githubusercontent.com/gergew452/Generation-Liberty/refs/heads/main/githubmirror/best.txt": {
     "total_parsed": 5786,
